@@ -1,19 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
     <title>Chat Desktop</title>
-    <link rel="stylesheet" href="style.css">
+
+    <link
+        rel="stylesheet"
+        href="/style.css"
+    >
+
 </head>
+
 
 <body>
 
-    <!-- LOGIN -->
+
+    <!-- ==================================================
+         LOGIN SCREEN
+    =================================================== -->
 
     <div id="loginScreen">
+
         <div class="loginBox">
+
             <h1>Chat</h1>
+
 
             <input
                 id="nameInput"
@@ -22,6 +41,7 @@
                 maxlength="30"
                 autocomplete="off"
             >
+
 
             <input
                 id="roomInput"
@@ -32,24 +52,39 @@
                 autocomplete="off"
             >
 
-            <button id="submitButton">Submit</button>
+
+            <button id="submitButton">
+                Submit
+            </button>
+
         </div>
+
     </div>
 
 
-    <!-- DESKTOP -->
+    <!-- ==================================================
+         DESKTOP
+    =================================================== -->
 
     <div id="desktop">
 
+
+        <!-- WORLD -->
+
         <div id="world"></div>
 
-        <!-- TASKBAR -->
+
+        <!-- ==================================================
+             TASKBAR
+        =================================================== -->
 
         <div id="taskbar">
+
 
             <button id="startButton">
                 Start
             </button>
+
 
             <input
                 id="messageInput"
@@ -59,13 +94,22 @@
                 autocomplete="off"
             >
 
+
         </div>
+
 
     </div>
 
 
+    <!-- ==================================================
+         SOCKET.IO
+    =================================================== -->
+
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+
+    <script src="/script.js"></script>
+
 
 </body>
+
 </html>
