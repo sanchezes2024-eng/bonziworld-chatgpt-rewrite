@@ -22,159 +22,321 @@ const server = http.createServer((req, res) => {
 
     fs.readFile(filePath, (err, data) => {
         if (err) {
+            console.error(err);
+
             res.writeHead(500);
             res.end("Server Error");
+
             return;
         }
 
-        const types = {
+        const contentTypes = {
             ".html": "text/html",
             ".css": "text/css",
             ".js": "application/javascript"
         };
 
+        const contentType =
+            contentTypes[path.extname(filePath)] ||
+            "text/plain";
+
         res.writeHead(200, {
-            "Content-Type": types[path.extname(filePath)] || "text/plain"
+            "Content-Type": contentType
         });
 
         res.end(data);
     });
 });
 
+
 const io = new Server(server);
+
+
+/*
+============================================================
+SOCKET.IO
+============================================================
+*/
 
 io.on("connection", (socket) => {
     console.log("Connected:", socket.id);
 
-    socket.on("joinRoom", ({ name, room }) => {
-        name = String(name || "Anonymous").trim();
-        room = String(room || "default").trim();
 
-        if (!name) name = "Anonymous";
-        if (!room) room = "default";
+    /*
+    ========================================================
+    JOIN ROOM
+    ========================================================
+    */
+
+    socket.on("joinRoom", (data) => {
+        let name = String(data?.name || "").trim();
+        let room = String(data?.room || "").trim();
+
+        if (!name) {
+            name = "Anonymous";
+        }
+
+        if (!room) {
+            room = "default";
+        }
+
 
         socket.join(room);
 
         socket.data.name = name;
         socket.data.room = room;
 
-        // Start everyone at a random position.
-        socket.data.x = Math.random() * 90 + 5;
-        socket.data.y = Math.random() * 90 + 5;
+
+        /*
+        ----------------------------------------------------
+        RANDOM STARTING POSITION
+        ----------------------------------------------------
+        */
+
+        socket.data.x =
+            Math.random() * 90 + 5;
+
+        socket.data.y =
+            Math.random() * 90 + 5;
+
+
+        /*
+        ----------------------------------------------------
+        TELL THE NEW USER WHO THEY ARE
+        ----------------------------------------------------
+        */
 
         socket.emit("joined", {
             id: socket.id,
-            name,
-            room,
+            name: name,
+            room: room,
             x: socket.data.x,
             y: socket.data.y
         });
+
+
+        /*
+        ----------------------------------------------------
+        TELL EVERYONE ELSE ABOUT THE NEW USER
+        ----------------------------------------------------
+        */
 
         socket.to(room).emit("playerJoined", {
             id: socket.id,
-            name,
+            name: name,
             x: socket.data.x,
             y: socket.data.y
         });
 
-        // Send the existing players to the new player.
-        const roomSockets = io.sockets.adapter.rooms.get(room);
+
+        /*
+        ----------------------------------------------------
+        SEND EXISTING USERS TO THE NEW USER
+        ----------------------------------------------------
+        */
+
+        const roomSockets =
+            io.sockets.adapter.rooms.get(room);
 
         if (roomSockets) {
             for (const id of roomSockets) {
-                if (id === socket.id) continue;
 
-                const otherSocket = io.sockets.sockets.get(id);
+                if (id === socket.id) {
+                    continue;
+                }
 
-                if (!otherSocket) continue;
+                const otherSocket =
+                    io.sockets.sockets.get(id);
+
+                if (!otherSocket) {
+                    continue;
+                }
 
                 socket.emit("playerJoined", {
-                    id,
+                    id: id,
                     name: otherSocket.data.name,
-                    x: otherSocket.data.x ?? 50,
-                    y: otherSocket.data.y ?? 50
+                    x: otherSocket.data.x,
+                    y: otherSocket.data.y
                 });
             }
         }
 
-        console.log(`${name} joined ${room}`);
+
+        console.log(
+            `${name} joined room "${room}"`
+        );
     });
 
 
     /*
-     * PLAYER MOVEMENT
-     */
+    ========================================================
+    PLAYER MOVEMENT
+    ========================================================
+    */
 
-    socket.on("move", ({ x, y }) => {
+    socket.on("move", (data) => {
+
         const room = socket.data.room;
 
-        if (!room) return;
+        /*
+        No room means the player has not joined yet.
+        */
 
-        x = Number(x);
-        y = Number(y);
-
-        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        if (!room) {
             return;
         }
 
-        // Keep the player inside the desktop.
-        x = Math.max(0, Math.min(100, x));
-        y = Math.max(0, Math.min(100, y));
+
+        let x = Number(data?.x);
+        let y = Number(data?.y);
+
+
+        /*
+        Reject invalid coordinates.
+        */
+
+        if (
+            !Number.isFinite(x) ||
+            !Number.isFinite(y)
+        ) {
+            return;
+        }
+
+
+        /*
+        Keep players inside the world.
+        */
+
+        x = Math.max(
+            5,
+            Math.min(95, x)
+        );
+
+        y = Math.max(
+            5,
+            Math.min(95, y)
+        );
+
+
+        /*
+        Save the position on the server.
+        */
 
         socket.data.x = x;
         socket.data.y = y;
 
-        socket.to(room).emit("playerMoved", {
-            id: socket.id,
-            x,
-            y
-        });
+
+        /*
+        Send the movement to everyone else
+        in this room.
+        */
+
+        socket.to(room).emit(
+            "playerMoved",
+            {
+                id: socket.id,
+                x: x,
+                y: y
+            }
+        );
     });
 
 
     /*
-     * CHAT MESSAGE
-     */
+    ========================================================
+    CHAT MESSAGE
+    ========================================================
+    */
 
     socket.on("message", (message) => {
-        const name = socket.data.name;
+
         const room = socket.data.room;
+        const name = socket.data.name;
 
-        if (!name || !room) return;
 
-        message = String(message || "").trim();
-
-        if (!message) return;
-
-        if (message.length > 300) {
-            message = message.substring(0, 300);
+        if (!room || !name) {
+            return;
         }
 
-        io.to(room).emit("message", {
-            id: socket.id,
-            name,
-            text: message
-        });
+
+        message =
+            String(message || "").trim();
+
+
+        if (!message) {
+            return;
+        }
+
+
+        /*
+        Limit messages to 300 characters.
+        */
+
+        if (message.length > 300) {
+            message =
+                message.substring(0, 300);
+        }
+
+
+        /*
+        Send the message to everyone in
+        the same room, including sender.
+        */
+
+        io.to(room).emit(
+            "message",
+            {
+                id: socket.id,
+                name: name,
+                text: message
+            }
+        );
     });
 
 
     /*
-     * DISCONNECT
-     */
+    ========================================================
+    DISCONNECT
+    ========================================================
+    */
 
     socket.on("disconnect", () => {
-        const room = socket.data.room;
+
+        const room =
+            socket.data.room;
+
 
         if (room) {
-            socket.to(room).emit("playerLeft", {
-                id: socket.id
-            });
+
+            socket.to(room).emit(
+                "playerLeft",
+                {
+                    id: socket.id
+                }
+            );
         }
 
-        console.log("Disconnected:", socket.id);
+
+        console.log(
+            "Disconnected:",
+            socket.id
+        );
     });
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}`);
-});
+
+/*
+============================================================
+START SERVER
+============================================================
+*/
+
+server.listen(
+    PORT,
+    "0.0.0.0",
+    () => {
+        console.log(
+            `Server running on port ${PORT}`
+        );
+    }
+);
