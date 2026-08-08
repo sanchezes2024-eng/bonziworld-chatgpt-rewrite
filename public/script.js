@@ -2,13 +2,11 @@ const socket = io();
 
 const loginScreen = document.getElementById("loginScreen");
 const desktop = document.getElementById("desktop");
+const world = document.getElementById("world");
 
 const nameInput = document.getElementById("nameInput");
 const roomInput = document.getElementById("roomInput");
-
 const submitButton = document.getElementById("submitButton");
-
-const world = document.getElementById("world");
 
 const messageInput = document.getElementById("messageInput");
 const startButton = document.getElementById("startButton");
@@ -19,10 +17,14 @@ let myRoom = null;
 
 const players = {};
 
+let dragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
 
 /*
-    LOGIN
-*/
+ * LOGIN
+ */
 
 submitButton.addEventListener("click", join);
 
@@ -61,8 +63,8 @@ function join() {
 
 
 /*
-    SUCCESSFULLY JOINED
-*/
+ * JOINED
+ */
 
 socket.on("joined", (data) => {
     myId = data.id;
@@ -75,6 +77,8 @@ socket.on("joined", (data) => {
     createPlayer(
         myId,
         myName,
+        data.x,
+        data.y,
         true
     );
 
@@ -83,8 +87,8 @@ socket.on("joined", (data) => {
 
 
 /*
-    NEW PLAYER
-*/
+ * NEW PLAYER
+ */
 
 socket.on("playerJoined", (data) => {
     if (data.id === myId) {
@@ -94,14 +98,177 @@ socket.on("playerJoined", (data) => {
     createPlayer(
         data.id,
         data.name,
+        data.x,
+        data.y,
         false
     );
 });
 
 
 /*
-    PLAYER LEFT
-*/
+ * CREATE PLAYER
+ */
+
+function createPlayer(id, name, x, y, isMe) {
+    if (players[id]) {
+        return;
+    }
+
+    const element = document.createElement("div");
+
+    element.className = "player";
+
+    const nameElement = document.createElement("div");
+
+    nameElement.className = "playerName";
+    nameElement.textContent = name;
+
+    element.appendChild(nameElement);
+
+    world.appendChild(element);
+
+    const player = {
+        element,
+        name,
+        x: x ?? 50,
+        y: y ?? 50,
+        isMe
+    };
+
+    players[id] = player;
+
+    updatePlayerPosition(player);
+
+    if (isMe) {
+        setupDragging(element);
+    }
+}
+
+
+/*
+ * UPDATE POSITION
+ */
+
+function updatePlayerPosition(player) {
+    player.element.style.left = `${player.x}%`;
+    player.element.style.top = `${player.y}%`;
+}
+
+
+/*
+ * DRAGGING
+ */
+
+function setupDragging(element) {
+    element.addEventListener("pointerdown", startDragging);
+
+    element.addEventListener("dragstart", (event) => {
+        event.preventDefault();
+    });
+}
+
+function startDragging(event) {
+    if (event.button !== 0) {
+        return;
+    }
+
+    dragging = true;
+
+    const player = players[myId];
+
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    dragOffsetX = event.clientX - rect.left - rect.width / 2;
+    dragOffsetY = event.clientY - rect.top - rect.height / 2;
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    event.currentTarget.style.cursor = "grabbing";
+
+    event.preventDefault();
+}
+
+document.addEventListener("pointermove", (event) => {
+    if (!dragging) {
+        return;
+    }
+
+    const player = players[myId];
+
+    if (!player) {
+        return;
+    }
+
+    const worldRect = world.getBoundingClientRect();
+
+    const playerX =
+        event.clientX -
+        worldRect.left -
+        dragOffsetX;
+
+    const playerY =
+        event.clientY -
+        worldRect.top -
+        dragOffsetY;
+
+    let x = (playerX / worldRect.width) * 100;
+    let y = (playerY / worldRect.height) * 100;
+
+    // Keep the square inside the desktop.
+    x = Math.max(2.5, Math.min(97.5, x));
+    y = Math.max(2.5, Math.min(97.5, y));
+
+    player.x = x;
+    player.y = y;
+
+    updatePlayerPosition(player);
+
+    /*
+     * Tell the server.
+     */
+
+    socket.emit("move", {
+        x,
+        y
+    });
+});
+
+document.addEventListener("pointerup", () => {
+    if (!dragging) {
+        return;
+    }
+
+    dragging = false;
+
+    const player = players[myId];
+
+    if (player) {
+        player.element.style.cursor = "grab";
+    }
+});
+
+
+/*
+ * RECEIVE OTHER PLAYER MOVEMENT
+ */
+
+socket.on("playerMoved", (data) => {
+    const player = players[data.id];
+
+    if (!player) {
+        return;
+    }
+
+    player.x = data.x;
+    player.y = data.y;
+
+    updatePlayerPosition(player);
+});
+
+
+/*
+ * PLAYER LEFT
+ */
 
 socket.on("playerLeft", (data) => {
     const player = players[data.id];
@@ -117,64 +284,8 @@ socket.on("playerLeft", (data) => {
 
 
 /*
-    CREATE PLAYER
-*/
-
-function createPlayer(id, name, isMe) {
-    if (players[id]) {
-        return;
-    }
-
-    const element = document.createElement("div");
-
-    element.className = "player";
-
-    const nameElement = document.createElement("div");
-
-    nameElement.className = "playerName";
-
-    nameElement.textContent = name;
-
-    element.appendChild(nameElement);
-
-    /*
-        Put players at different starting positions.
-        The server does not currently synchronize movement,
-        so these are just placeholders.
-    */
-
-    let x;
-    let y;
-
-    if (isMe) {
-        x = world.clientWidth / 2;
-        y = world.clientHeight / 2;
-    } else {
-        const count = Object.keys(players).length;
-
-        x = 100 + ((count * 100) % Math.max(200, world.clientWidth - 100));
-
-        y = 100 + ((count * 70) % Math.max(150, world.clientHeight - 100));
-    }
-
-    element.style.left = `${x}px`;
-    element.style.top = `${y}px`;
-
-    world.appendChild(element);
-
-    players[id] = {
-        element,
-        name,
-        x,
-        y,
-        isMe
-    };
-}
-
-
-/*
-    SEND MESSAGE
-*/
+ * SEND MESSAGE
+ */
 
 startButton.addEventListener("click", sendMessage);
 
@@ -201,8 +312,8 @@ function sendMessage() {
 
 
 /*
-    RECEIVE MESSAGE
-*/
+ * RECEIVE MESSAGE
+ */
 
 socket.on("message", (data) => {
     const player = players[data.id];
@@ -219,12 +330,12 @@ socket.on("message", (data) => {
 
 
 /*
-    SPEECH BUBBLE
-*/
+ * SPEECH BUBBLE
+ */
 
 function showSpeechBubble(player, text) {
-    // Remove an existing bubble
-    const oldBubble = player.element.querySelector(".speechBubble");
+    const oldBubble =
+        player.element.querySelector(".speechBubble");
 
     if (oldBubble) {
         oldBubble.remove();
@@ -233,14 +344,9 @@ function showSpeechBubble(player, text) {
     const bubble = document.createElement("div");
 
     bubble.className = "speechBubble";
-
     bubble.textContent = text;
 
     player.element.appendChild(bubble);
-
-    /*
-        Keep the bubble visible for 5 seconds.
-    */
 
     setTimeout(() => {
         if (bubble.parentNode) {
