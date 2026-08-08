@@ -1,356 +1,889 @@
 const socket = io();
 
-const loginScreen = document.getElementById("loginScreen");
-const desktop = document.getElementById("desktop");
-const world = document.getElementById("world");
 
-const nameInput = document.getElementById("nameInput");
-const roomInput = document.getElementById("roomInput");
-const submitButton = document.getElementById("submitButton");
+/*
+============================================================
+ELEMENTS
+============================================================
+*/
 
-const messageInput = document.getElementById("messageInput");
-const startButton = document.getElementById("startButton");
+const loginScreen =
+    document.getElementById("loginScreen");
 
-let myId = null;
-let myName = null;
-let myRoom = null;
+const desktop =
+    document.getElementById("desktop");
 
-const players = {};
+const world =
+    document.getElementById("world");
 
-let dragging = false;
-let dragOffsetX = 0;
-let dragOffsetY = 0;
+const nameInput =
+    document.getElementById("nameInput");
+
+const roomInput =
+    document.getElementById("roomInput");
+
+const submitButton =
+    document.getElementById("submitButton");
+
+const messageInput =
+    document.getElementById("messageInput");
+
+const startButton =
+    document.getElementById("startButton");
 
 
 /*
- * LOGIN
- */
+============================================================
+CURRENT USER
+============================================================
+*/
 
-submitButton.addEventListener("click", join);
+let myId = null;
 
-nameInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-        join();
+let myName = null;
+
+let myRoom = null;
+
+
+/*
+============================================================
+PLAYERS
+============================================================
+*/
+
+const players = {};
+
+
+/*
+============================================================
+DRAG STATE
+============================================================
+*/
+
+let dragging = false;
+
+let dragPointerId = null;
+
+
+/*
+============================================================
+LOGIN
+============================================================
+*/
+
+submitButton.addEventListener(
+    "click",
+    join
+);
+
+
+nameInput.addEventListener(
+    "keydown",
+    (event) => {
+
+        if (event.key === "Enter") {
+            join();
+        }
+
     }
-});
+);
 
-roomInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-        join();
+
+roomInput.addEventListener(
+    "keydown",
+    (event) => {
+
+        if (event.key === "Enter") {
+            join();
+        }
+
     }
-});
+);
+
 
 function join() {
-    const name = nameInput.value.trim();
 
-    let room = roomInput.value.trim();
+    const name =
+        nameInput.value.trim();
+
+    let room =
+        roomInput.value.trim();
+
 
     if (!name) {
+
         nameInput.focus();
+
         return;
     }
 
+
     if (!room) {
+
         room = "default";
-        roomInput.value = "default";
+
+        roomInput.value =
+            "default";
     }
 
-    socket.emit("joinRoom", {
-        name,
-        room
-    });
+
+    socket.emit(
+        "joinRoom",
+        {
+            name: name,
+            room: room
+        }
+    );
 }
 
 
 /*
- * JOINED
- */
+============================================================
+JOINED
+============================================================
+*/
 
-socket.on("joined", (data) => {
-    myId = data.id;
-    myName = data.name;
-    myRoom = data.room;
+socket.on(
+    "joined",
+    (data) => {
 
-    loginScreen.style.display = "none";
-    desktop.style.display = "block";
+        myId =
+            data.id;
 
-    createPlayer(
-        myId,
-        myName,
-        data.x,
-        data.y,
-        true
-    );
+        myName =
+            data.name;
 
-    messageInput.focus();
-});
+        myRoom =
+            data.room;
 
 
-/*
- * NEW PLAYER
- */
+        loginScreen.style.display =
+            "none";
 
-socket.on("playerJoined", (data) => {
-    if (data.id === myId) {
-        return;
+
+        desktop.style.display =
+            "block";
+
+
+        createPlayer(
+            data.id,
+            data.name,
+            data.x,
+            data.y,
+            true
+        );
+
+
+        messageInput.focus();
     }
-
-    createPlayer(
-        data.id,
-        data.name,
-        data.x,
-        data.y,
-        false
-    );
-});
+);
 
 
 /*
- * CREATE PLAYER
- */
+============================================================
+NEW PLAYER
+============================================================
+*/
 
-function createPlayer(id, name, x, y, isMe) {
+socket.on(
+    "playerJoined",
+    (data) => {
+
+        /*
+        Never create ourselves
+        as another player.
+        */
+
+        if (data.id === myId) {
+            return;
+        }
+
+
+        createPlayer(
+            data.id,
+            data.name,
+            data.x,
+            data.y,
+            false
+        );
+    }
+);
+
+
+/*
+============================================================
+CREATE PLAYER
+============================================================
+*/
+
+function createPlayer(
+    id,
+    name,
+    x,
+    y,
+    isMe
+) {
+
+    /*
+    Already exists.
+    */
+
     if (players[id]) {
         return;
     }
 
-    const element = document.createElement("div");
 
-    element.className = "player";
+    /*
+    Create square.
+    */
 
-    const nameElement = document.createElement("div");
+    const element =
+        document.createElement(
+            "div"
+        );
 
-    nameElement.className = "playerName";
-    nameElement.textContent = name;
 
-    element.appendChild(nameElement);
+    element.className =
+        "player";
 
-    world.appendChild(element);
 
-    const player = {
-        element,
-        name,
-        x: x ?? 50,
-        y: y ?? 50,
-        isMe
-    };
+    /*
+    Give the element its owner's
+    Socket.IO ID.
+    */
 
-    players[id] = player;
+    element.dataset.playerId =
+        id;
 
-    updatePlayerPosition(player);
+
+    /*
+    ONLY OUR PLAYER receives
+    the myPlayer class.
+    */
 
     if (isMe) {
-        setupDragging(element);
+
+        element.classList.add(
+            "myPlayer"
+        );
+    }
+
+
+    /*
+    Name label.
+    */
+
+    const nameElement =
+        document.createElement(
+            "div"
+        );
+
+
+    nameElement.className =
+        "playerName";
+
+
+    nameElement.textContent =
+        name;
+
+
+    element.appendChild(
+        nameElement
+    );
+
+
+    /*
+    Add player to world.
+    */
+
+    world.appendChild(
+        element
+    );
+
+
+    /*
+    Store player.
+    */
+
+    const player = {
+
+        element: element,
+
+        name: name,
+
+        x: Number(x) || 50,
+
+        y: Number(y) || 50,
+
+        isMe: isMe
+    };
+
+
+    players[id] =
+        player;
+
+
+    /*
+    Set position.
+    */
+
+    updatePlayerPosition(
+        player
+    );
+
+
+    /*
+    ========================================================
+    IMPORTANT:
+    ONLY OUR CHARACTER GETS A DRAG HANDLER.
+    ========================================================
+    */
+
+    if (isMe) {
+
+        element.addEventListener(
+            "pointerdown",
+            startDragging
+        );
+
+    } else {
+
+        /*
+        Other players cannot receive
+        pointer interaction.
+        */
+
+        element.style.pointerEvents =
+            "none";
     }
 }
 
 
 /*
- * UPDATE POSITION
- */
+============================================================
+POSITION
+============================================================
+*/
 
-function updatePlayerPosition(player) {
-    player.element.style.left = `${player.x}%`;
-    player.element.style.top = `${player.y}%`;
+function updatePlayerPosition(
+    player
+) {
+
+    player.element.style.left =
+        `${player.x}%`;
+
+    player.element.style.top =
+        `${player.y}%`;
 }
 
 
 /*
- * DRAGGING
- */
-
-function setupDragging(element) {
-    element.addEventListener("pointerdown", startDragging);
-
-    element.addEventListener("dragstart", (event) => {
-        event.preventDefault();
-    });
-}
+============================================================
+START DRAGGING
+============================================================
+*/
 
 function startDragging(event) {
-    if (event.button !== 0) {
+
+    event.preventDefault();
+
+    event.stopPropagation();
+
+
+    /*
+    Get the element that was clicked.
+    */
+
+    const element =
+        event.currentTarget;
+
+
+    /*
+    Read its owner ID.
+    */
+
+    const ownerId =
+        element.dataset.playerId;
+
+
+    /*
+    HARD SECURITY CHECK:
+    It must belong to us.
+    */
+
+    if (ownerId !== myId) {
+
         return;
     }
+
+
+    /*
+    Make sure our player exists.
+    */
+
+    const player =
+        players[myId];
+
+
+    if (!player) {
+
+        return;
+    }
+
+
+    /*
+    Extra check.
+    */
+
+    if (!player.isMe) {
+
+        return;
+    }
+
+
+    /*
+    Start dragging.
+    */
 
     dragging = true;
 
-    const player = players[myId];
+    dragPointerId =
+        event.pointerId;
 
-    const rect = event.currentTarget.getBoundingClientRect();
-
-    dragOffsetX = event.clientX - rect.left - rect.width / 2;
-    dragOffsetY = event.clientY - rect.top - rect.height / 2;
-
-    event.currentTarget.setPointerCapture(event.pointerId);
-
-    event.currentTarget.style.cursor = "grabbing";
-
-    event.preventDefault();
-}
-
-document.addEventListener("pointermove", (event) => {
-    if (!dragging) {
-        return;
-    }
-
-    const player = players[myId];
-
-    if (!player) {
-        return;
-    }
-
-    const worldRect = world.getBoundingClientRect();
-
-    const playerX =
-        event.clientX -
-        worldRect.left -
-        dragOffsetX;
-
-    const playerY =
-        event.clientY -
-        worldRect.top -
-        dragOffsetY;
-
-    let x = (playerX / worldRect.width) * 100;
-    let y = (playerY / worldRect.height) * 100;
-
-    // Keep the square inside the desktop.
-    x = Math.max(2.5, Math.min(97.5, x));
-    y = Math.max(2.5, Math.min(97.5, y));
-
-    player.x = x;
-    player.y = y;
-
-    updatePlayerPosition(player);
 
     /*
-     * Tell the server.
-     */
+    Capture the pointer.
+    */
 
-    socket.emit("move", {
-        x,
-        y
-    });
-});
+    element.setPointerCapture(
+        event.pointerId
+    );
 
-document.addEventListener("pointerup", () => {
-    if (!dragging) {
-        return;
-    }
 
-    dragging = false;
-
-    const player = players[myId];
-
-    if (player) {
-        player.element.style.cursor = "grab";
-    }
-});
+    element.style.cursor =
+        "grabbing";
+}
 
 
 /*
- * RECEIVE OTHER PLAYER MOVEMENT
- */
+============================================================
+DRAG PLAYER
+============================================================
+*/
 
-socket.on("playerMoved", (data) => {
-    const player = players[data.id];
+document.addEventListener(
+    "pointermove",
+    (event) => {
 
-    if (!player) {
-        return;
+        /*
+        Not dragging.
+        */
+
+        if (!dragging) {
+
+            return;
+        }
+
+
+        /*
+        Only process the pointer
+        that started the drag.
+        */
+
+        if (
+            event.pointerId !==
+            dragPointerId
+        ) {
+
+            return;
+        }
+
+
+        /*
+        Get OUR player.
+        */
+
+        const player =
+            players[myId];
+
+
+        if (!player) {
+
+            dragging = false;
+
+            return;
+        }
+
+
+        /*
+        Extra ownership check.
+        */
+
+        if (
+            player.element.dataset.playerId !==
+            myId
+        ) {
+
+            dragging = false;
+
+            return;
+        }
+
+
+        /*
+        Get world dimensions.
+        */
+
+        const worldRect =
+            world.getBoundingClientRect();
+
+
+        /*
+        Convert mouse coordinates
+        to percentages.
+        */
+
+        let x =
+            (
+                event.clientX -
+                worldRect.left
+            )
+            /
+            worldRect.width
+            *
+            100;
+
+
+        let y =
+            (
+                event.clientY -
+                worldRect.top
+            )
+            /
+            worldRect.height
+            *
+            100;
+
+
+        /*
+        Keep the player inside
+        the world.
+        */
+
+        x =
+            Math.max(
+                5,
+                Math.min(95, x)
+            );
+
+
+        y =
+            Math.max(
+                5,
+                Math.min(95, y)
+            );
+
+
+        /*
+        Update our local position.
+        */
+
+        player.x = x;
+
+        player.y = y;
+
+
+        updatePlayerPosition(
+            player
+        );
+
+
+        /*
+        Send movement to server.
+        */
+
+        socket.emit(
+            "move",
+            {
+                x: x,
+                y: y
+            }
+        );
     }
-
-    player.x = data.x;
-    player.y = data.y;
-
-    updatePlayerPosition(player);
-});
+);
 
 
 /*
- * PLAYER LEFT
- */
+============================================================
+STOP DRAGGING
+============================================================
+*/
 
-socket.on("playerLeft", (data) => {
-    const player = players[data.id];
+document.addEventListener(
+    "pointerup",
+    (event) => {
 
-    if (!player) {
-        return;
+        if (!dragging) {
+            return;
+        }
+
+
+        if (
+            event.pointerId !==
+            dragPointerId
+        ) {
+
+            return;
+        }
+
+
+        dragging = false;
+
+        dragPointerId = null;
+
+
+        const player =
+            players[myId];
+
+
+        if (player) {
+
+            player.element.style.cursor =
+                "grab";
+        }
     }
-
-    player.element.remove();
-
-    delete players[data.id];
-});
+);
 
 
 /*
- * SEND MESSAGE
- */
+============================================================
+PLAYER MOVEMENT FROM SERVER
+============================================================
+*/
 
-startButton.addEventListener("click", sendMessage);
+socket.on(
+    "playerMoved",
+    (data) => {
 
-messageInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-        event.preventDefault();
-        sendMessage();
+        /*
+        Ignore our own movement.
+        */
+
+        if (data.id === myId) {
+
+            return;
+        }
+
+
+        /*
+        Find the other player.
+        */
+
+        const player =
+            players[data.id];
+
+
+        /*
+        Player isn't loaded yet.
+        */
+
+        if (!player) {
+
+            return;
+        }
+
+
+        /*
+        Update position.
+        */
+
+        player.x =
+            Number(data.x);
+
+        player.y =
+            Number(data.y);
+
+
+        updatePlayerPosition(
+            player
+        );
     }
-});
+);
+
+
+/*
+============================================================
+PLAYER LEFT
+============================================================
+*/
+
+socket.on(
+    "playerLeft",
+    (data) => {
+
+        const player =
+            players[data.id];
+
+
+        if (!player) {
+
+            return;
+        }
+
+
+        player.element.remove();
+
+
+        delete players[
+            data.id
+        ];
+    }
+);
+
+
+/*
+============================================================
+SEND MESSAGE
+============================================================
+*/
+
+startButton.addEventListener(
+    "click",
+    sendMessage
+);
+
+
+messageInput.addEventListener(
+    "keydown",
+    (event) => {
+
+        if (event.key === "Enter") {
+
+            event.preventDefault();
+
+            sendMessage();
+        }
+    }
+);
+
 
 function sendMessage() {
-    const text = messageInput.value.trim();
+
+    const text =
+        messageInput.value.trim();
+
 
     if (!text) {
+
         return;
     }
 
-    socket.emit("message", text);
 
-    messageInput.value = "";
+    socket.emit(
+        "message",
+        text
+    );
+
+
+    messageInput.value =
+        "";
+
 
     messageInput.focus();
 }
 
 
 /*
- * RECEIVE MESSAGE
- */
+============================================================
+RECEIVE MESSAGE
+============================================================
+*/
 
-socket.on("message", (data) => {
-    const player = players[data.id];
+socket.on(
+    "message",
+    (data) => {
 
-    if (!player) {
-        return;
+        const player =
+            players[data.id];
+
+
+        if (!player) {
+
+            return;
+        }
+
+
+        showSpeechBubble(
+            player,
+            data.text
+        );
     }
-
-    showSpeechBubble(
-        player,
-        data.text
-    );
-});
+);
 
 
 /*
- * SPEECH BUBBLE
- */
+============================================================
+SPEECH BUBBLE
+============================================================
+*/
 
-function showSpeechBubble(player, text) {
+function showSpeechBubble(
+    player,
+    text
+) {
+
+    /*
+    Remove old bubble.
+    */
+
     const oldBubble =
-        player.element.querySelector(".speechBubble");
+        player.element.querySelector(
+            ".speechBubble"
+        );
+
 
     if (oldBubble) {
+
         oldBubble.remove();
     }
 
-    const bubble = document.createElement("div");
 
-    bubble.className = "speechBubble";
-    bubble.textContent = text;
+    /*
+    Create bubble.
+    */
 
-    player.element.appendChild(bubble);
+    const bubble =
+        document.createElement(
+            "div"
+        );
 
-    setTimeout(() => {
-        if (bubble.parentNode) {
-            bubble.remove();
-        }
-    }, 5000);
+
+    bubble.className =
+        "speechBubble";
+
+
+    bubble.textContent =
+        text;
+
+
+    player.element.appendChild(
+        bubble
+    );
+
+
+    /*
+    Remove after 5 seconds.
+    */
+
+    setTimeout(
+        () => {
+
+            if (bubble.parentNode) {
+
+                bubble.remove();
+            }
+
+        },
+        5000
+    );
 }
