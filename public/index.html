@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Desktop</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- LOGIN -->
+
+    <div id="loginScreen">
+        <div class="loginBox">
+            <h1>Chat</h1>
+
+            <input
+                id="nameInput"
+                type="text"
+                placeholder="Your name"
+                maxlength="30"
+                autocomplete="off"
+            >
+
+            <input
+                id="roomInput"
+                type="text"
+                value="default"
+                placeholder="Room ID"
+                maxlength="50"
+                autocomplete="off"
+            >
+
+            <button id="submitButton">Submit</button>
+        </div>
+    </div>
+
+
+    <!-- DESKTOP -->
+
+    <div id="desktop">
+
+        <div id="world"></div>
+
+        <!-- TASKBAR -->
+
+        <div id="taskbar">
+
+            <button id="startButton">
+                Start
+            </button>
+
+            <input
+                id="messageInput"
+                type="text"
+                placeholder="Type a message..."
+                maxlength="300"
+                autocomplete="off"
+            >
+
+        </div>
+
+    </div>
+
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
