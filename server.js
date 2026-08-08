@@ -58,9 +58,9 @@ io.on("connection", (socket) => {
         socket.data.name = name;
         socket.data.room = room;
 
-        // Start everyone near the center.
-        socket.data.x = 50;
-        socket.data.y = 50;
+        // Start everyone at a random position.
+        socket.data.x = Math.random() * 90 + 5;
+        socket.data.y = Math.random() * 90 + 5;
 
         socket.emit("joined", {
             id: socket.id,
