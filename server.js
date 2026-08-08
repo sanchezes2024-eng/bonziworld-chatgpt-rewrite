@@ -27,8 +27,6 @@ const server = http.createServer((req, res) => {
             return;
         }
 
-        const ext = path.extname(filePath);
-
         const types = {
             ".html": "text/html",
             ".css": "text/css",
@@ -36,7 +34,7 @@ const server = http.createServer((req, res) => {
         };
 
         res.writeHead(200, {
-            "Content-Type": types[ext] || "text/plain"
+            "Content-Type": types[path.extname(filePath)] || "text/plain"
         });
 
         res.end(data);
@@ -46,7 +44,7 @@ const server = http.createServer((req, res) => {
 const io = new Server(server);
 
 io.on("connection", (socket) => {
-    console.log("Client connected:", socket.id);
+    console.log("Connected:", socket.id);
 
     socket.on("joinRoom", ({ name, room }) => {
         name = String(name || "Anonymous").trim();
@@ -60,21 +58,83 @@ io.on("connection", (socket) => {
         socket.data.name = name;
         socket.data.room = room;
 
-        // Tell everyone in the room that a new player joined
-        io.to(room).emit("playerJoined", {
-            id: socket.id,
-            name
-        });
+        // Start everyone near the center.
+        socket.data.x = 50;
+        socket.data.y = 50;
 
-        // Give the new client their own player data
         socket.emit("joined", {
             id: socket.id,
             name,
-            room
+            room,
+            x: socket.data.x,
+            y: socket.data.y
         });
 
-        console.log(`${name} joined room ${room}`);
+        socket.to(room).emit("playerJoined", {
+            id: socket.id,
+            name,
+            x: socket.data.x,
+            y: socket.data.y
+        });
+
+        // Send the existing players to the new player.
+        const roomSockets = io.sockets.adapter.rooms.get(room);
+
+        if (roomSockets) {
+            for (const id of roomSockets) {
+                if (id === socket.id) continue;
+
+                const otherSocket = io.sockets.sockets.get(id);
+
+                if (!otherSocket) continue;
+
+                socket.emit("playerJoined", {
+                    id,
+                    name: otherSocket.data.name,
+                    x: otherSocket.data.x ?? 50,
+                    y: otherSocket.data.y ?? 50
+                });
+            }
+        }
+
+        console.log(`${name} joined ${room}`);
     });
+
+
+    /*
+     * PLAYER MOVEMENT
+     */
+
+    socket.on("move", ({ x, y }) => {
+        const room = socket.data.room;
+
+        if (!room) return;
+
+        x = Number(x);
+        y = Number(y);
+
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+            return;
+        }
+
+        // Keep the player inside the desktop.
+        x = Math.max(0, Math.min(100, x));
+        y = Math.max(0, Math.min(100, y));
+
+        socket.data.x = x;
+        socket.data.y = y;
+
+        socket.to(room).emit("playerMoved", {
+            id: socket.id,
+            x,
+            y
+        });
+    });
+
+
+    /*
+     * CHAT MESSAGE
+     */
 
     socket.on("message", (message) => {
         const name = socket.data.name;
@@ -86,7 +146,6 @@ io.on("connection", (socket) => {
 
         if (!message) return;
 
-        // Limit messages to 300 characters
         if (message.length > 300) {
             message = message.substring(0, 300);
         }
@@ -98,22 +157,24 @@ io.on("connection", (socket) => {
         });
     });
 
+
+    /*
+     * DISCONNECT
+     */
+
     socket.on("disconnect", () => {
-        const name = socket.data.name;
         const room = socket.data.room;
 
-        if (name && room) {
-            io.to(room).emit("playerLeft", {
+        if (room) {
+            socket.to(room).emit("playerLeft", {
                 id: socket.id
             });
-
-            console.log(`${name} left room ${room}`);
         }
 
-        console.log("Client disconnected:", socket.id);
+        console.log("Disconnected:", socket.id);
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
 });
