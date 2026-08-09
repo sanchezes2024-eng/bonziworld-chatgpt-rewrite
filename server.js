@@ -16,6 +16,12 @@ const server = http.createServer((req, res) => {
         filePath = path.join(__dirname, "public", "script.js");
     } else if (req.url === "/background.png") {
         filePath = path.join(__dirname, "public", "background.png");
+     } else if (req.url === "/speakClient.js") {
+        filePath = path.join(__dirname, "public",  "speakClient.js");
+     } else if (req.url === "/speakWorker.js") {
+        filePath = path.join(__dirname, "public",  "speakWorker.js");
+     } else if (req.url === "/speakGenerator.js") {
+        filePath = path.join(__dirname, "public",  "speakGenerator.js");
     } else {
         res.writeHead(404);
         res.end("Not Found");
@@ -36,7 +42,8 @@ const server = http.createServer((req, res) => {
             ".html": "text/html",
             ".css": "text/css",
             ".js": "application/javascript",
-            ".png": "image/png"
+            ".png": "image/png",
+            ".wav": "audio/wav"
         };
 
         const contentType =
