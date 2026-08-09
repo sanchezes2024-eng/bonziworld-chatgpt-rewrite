@@ -66,6 +66,25 @@ const server = http.createServer((req, res) => {
                 "index.html"
             );
 
+    } else if (url === "/readme.html") {
+
+        filePath =
+            path.join(
+                __dirname,
+                "public",
+                "readme.html"
+            );
+        
+    } else if (url === "/readme.css") {
+
+        filePath =
+            path.join(
+                __dirname,
+                "public",
+                "readme.css"
+            );
+
+
     } else if (url === "/style.css") {
 
         filePath =
