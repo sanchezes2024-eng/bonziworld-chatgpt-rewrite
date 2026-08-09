@@ -52,6 +52,87 @@ let ttsMode =
 
 /*
 ============================================================
+SETTINGS
+============================================================
+*/
+
+settingsButton.addEventListener(
+    "click",
+    () => {
+
+        if (
+            settingsPanel.style.display ===
+            "block"
+        ) {
+
+            settingsPanel.style.display =
+                "none";
+
+        } else {
+
+            settingsPanel.style.display =
+                "block";
+        }
+    }
+);
+
+
+closeSettings.addEventListener(
+    "click",
+    () => {
+
+        settingsPanel.style.display =
+            "none";
+    }
+);
+
+
+/*
+Set the saved radio button.
+*/
+
+ttsOptions.forEach((option) => {
+
+    option.checked =
+        option.value === ttsMode;
+
+
+    option.addEventListener(
+        "change",
+        () => {
+
+            if (!option.checked) {
+                return;
+            }
+
+
+            ttsMode =
+                option.value;
+
+
+            localStorage.setItem(
+                "ttsMode",
+                ttsMode
+            );
+
+
+            /*
+            Stop currently playing speech
+            when switching modes.
+            */
+
+            if (
+                window.speechSynthesis
+            ) {
+
+                window.speechSynthesis.cancel();
+            }
+        }
+    );
+});
+
+/*
+============================================================
 CURRENT USER
 ============================================================
 */
@@ -846,74 +927,157 @@ SPEECH BUBBLE
 */
 
 function showSpeechBubble(player, text) {
+
     const oldBubble =
-        player.element.querySelector(".speechBubble");
+        player.element.querySelector(
+            ".speechBubble"
+        );
+
 
     if (oldBubble) {
         oldBubble.remove();
     }
 
-    const bubble = document.createElement("div");
 
-    bubble.className = "speechBubble";
-    bubble.textContent = text;
+    const bubble =
+        document.createElement("div");
 
-    player.element.appendChild(bubble);
 
-    /*
-     * Make speak.js generate and play the speech.
-     */
+    bubble.className =
+        "speechBubble";
 
-    if (typeof speak === "function") {
-        speak(text, {
-            amplitude: 100,
-            pitch: 50,
-            speed: 175,
-            voice: "en/en-us"
-        });
-    } else {
-        console.error(
-            "speak.js was not loaded."
-        );
 
-        return;
-    }
+    bubble.textContent =
+        text;
+
+
+    player.element.appendChild(
+        bubble
+    );
+
 
     /*
-     * speak.js doesn't document an onended
-     * callback, so watch its generated audio.
-     */
+    ========================================================
+    BROWSER TTS
+    ========================================================
+    */
 
-    const waitForAudio = setInterval(() => {
-        const audio =
-            document.querySelector("#audio audio");
+    if (ttsMode === "browser") {
 
-        if (!audio) {
-            return;
-        }
+        const utterance =
+            new SpeechSynthesisUtterance(
+                text
+            );
 
-        clearInterval(waitForAudio);
 
-        audio.onended = () => {
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+
+
+        utterance.onend = () => {
+
             if (bubble.parentNode) {
                 bubble.remove();
             }
         };
-    }, 50);
+
+
+        utterance.onerror = (event) => {
+
+            console.error(
+                "Browser TTS error:",
+                event.error
+            );
+
+
+            if (bubble.parentNode) {
+                bubble.remove();
+            }
+        };
+
+
+        window.speechSynthesis.cancel();
+
+        window.speechSynthesis.speak(
+            utterance
+        );
+
+
+        return;
+    }
+
 
     /*
-     * Safety cleanup in case audio fails.
-     */
+    ========================================================
+    ESPEAK / SPEAK.JS
+    ========================================================
+    */
 
-    setTimeout(() => {
-        clearInterval(waitForAudio);
+    if (ttsMode === "espeak") {
 
         if (
-            bubble.parentNode &&
-            (!document.querySelector("#audio audio") ||
-             document.querySelector("#audio audio").ended)
+            typeof speak !==
+            "function"
         ) {
-            bubble.remove();
+
+            console.error(
+                "speak.js is not loaded."
+            );
+
+            return;
         }
-    }, Math.max(10000, text.length * 200));
+
+
+        speak(
+            text,
+            {
+                amplitude: 100,
+                pitch: 50,
+                speed: 175,
+                voice: "en/en-us"
+            }
+        );
+
+
+        /*
+        speak.js creates an audio element
+        inside #audio.
+        */
+
+        const waitForAudio =
+            setInterval(() => {
+
+                const audio =
+                    document.querySelector(
+                        "#audio audio"
+                    );
+
+
+                if (!audio) {
+                    return;
+                }
+
+
+                clearInterval(
+                    waitForAudio
+                );
+
+
+                audio.onended = () => {
+
+                    if (
+                        bubble.parentNode
+                    ) {
+
+                        bubble.remove();
+                    }
+                };
+
+
+            }, 50);
+
+
+        return;
+    }
 }
