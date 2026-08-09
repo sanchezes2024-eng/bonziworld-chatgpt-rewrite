@@ -1,35 +1,36 @@
+```css
+/* ============================================================
+   GLOBAL
+   ============================================================ */
+
 * {
     box-sizing: border-box;
 }
-
 
 html,
 body {
     width: 100%;
     height: 100%;
-
     margin: 0;
+    padding: 0;
 
     overflow: hidden;
 
-    font-family: Arial, sans-serif;
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
 }
 
 
-/*
-============================================================
-LOGIN
-============================================================
-*/
+/* ============================================================
+   LOGIN SCREEN
+   ============================================================ */
 
 #loginScreen {
     position: fixed;
 
-    left: 0;
-    top: 0;
-
-    width: 100%;
-    height: 100%;
+    inset: 0;
 
     display: flex;
 
@@ -37,179 +38,180 @@ LOGIN
     justify-content: center;
 
     background: #202020;
+
+    z-index: 5000;
 }
 
 
 .loginBox {
     width: 320px;
 
-    padding: 30px;
+    padding: 25px;
 
-    background: #eeeeee;
+    background: #c0c0c0;
 
-    border: 2px solid #555555;
+    border: 3px outset #eeeeee;
 
     box-shadow:
-        0 10px 30px rgba(0, 0, 0, 0.5);
-
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 12px;
-}
-
-
-.loginBox h1 {
-    margin: 0 0 10px 0;
+        8px 8px 0 rgba(0, 0, 0, 0.35);
 
     text-align: center;
 }
 
 
+.loginBox h1 {
+    margin: 0 0 20px 0;
+
+    font-size: 24px;
+
+    color: #000000;
+}
+
+
 .loginBox input {
+    display: block;
+
     width: 100%;
 
-    height: 42px;
+    height: 36px;
 
-    padding: 0 10px;
+    margin-bottom: 12px;
 
-    font-size: 16px;
+    padding: 6px 8px;
 
-    border: 1px solid #888888;
+    background: #ffffff;
+
+    color: #000000;
+
+    border: 2px inset #eeeeee;
 
     outline: none;
+
+    font-size: 15px;
 }
 
 
 .loginBox input:focus {
-    border-color: #444444;
+    outline: 1px solid #000080;
 }
 
 
-.loginBox button {
+#submitButton {
     width: 100%;
 
-    height: 42px;
+    height: 36px;
+
+    margin-top: 5px;
 
     background: #c0c0c0;
 
+    color: #000000;
+
     border: 2px outset #eeeeee;
 
-    font-size: 16px;
+    font-size: 14px;
 
     cursor: pointer;
 }
 
 
-.loginBox button:active {
+#submitButton:active {
     border-style: inset;
 }
 
 
-/*
-============================================================
-DESKTOP
-============================================================
-*/
+/* ============================================================
+   DESKTOP
+   ============================================================ */
 
 #desktop {
     position: fixed;
 
-    left: 0;
-    top: 0;
-
-    width: 100%;
-    height: 100%;
+    inset: 0;
 
     display: none;
 
-    background-image: url("/background.png");
-    background-size: cover;
+    overflow: hidden;
+
+    background-color: #008080;
+
+    background-image:
+        url("/background.png");
+
     background-position: center;
+
     background-repeat: no-repeat;
+
+    background-size: cover;
 }
 
-/*
-============================================================
-WORLD
-============================================================
-*/
+
+/* ============================================================
+   WORLD
+   ============================================================ */
 
 #world {
     position: absolute;
 
-    left: 0;
     top: 0;
+    left: 0;
 
     width: 100%;
-    height: calc(100% - 50px);
+    height: 100%;
 
     overflow: hidden;
+
+    z-index: 1;
+
+    user-select: none;
+    -webkit-user-select: none;
+
+    touch-action: none;
 }
 
 
-/*
-============================================================
-PLAYERS
-============================================================
-*/
+/* ============================================================
+   PLAYER
+   ============================================================ */
 
 .player {
     position: absolute;
 
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
 
-    background: purple;
+    /*
+    x/y represent the center of
+    the character.
+    */
 
     transform: translate(-50%, -50%);
 
-    border: 2px solid #300030;
+    background: #8000ff;
+
+    border: 2px solid rgba(0, 0, 0, 0.35);
+
+    border-radius: 3px;
 
     user-select: none;
+    -webkit-user-select: none;
 
     touch-action: none;
 
-    z-index: 5;
-}
-
-
-/*
-ONLY YOUR PLAYER IS DRAGGABLE
-*/
-
-.player.myPlayer {
     cursor: grab;
+
+    z-index: 10;
 }
 
 
-.player.myPlayer:active {
+.player:active {
     cursor: grabbing;
 }
 
 
 /*
-OTHER PLAYERS
-*/
-
-.player:not(.myPlayer) {
-    cursor: default;
-
-    /*
-    This makes it impossible to
-    accidentally treat them as
-    draggable UI.
-    */
-
-    pointer-events: none;
-}
-
-
-/*
-============================================================
-PLAYER NAME
-============================================================
+Only the character itself should
+receive dragging events.
 */
 
 .playerName {
@@ -219,65 +221,84 @@ PLAYER NAME
 
     bottom: 100%;
 
-    transform: translateX(-50%);
+    transform:
+        translateX(-50%);
 
-    margin-bottom: 5px;
+    margin-bottom: 4px;
 
-    color: white;
+    padding: 2px 5px;
 
-    font-size: 13px;
+    max-width: 150px;
+
+    overflow: hidden;
 
     white-space: nowrap;
 
-    text-shadow:
-        1px 1px 2px black;
+    text-overflow: ellipsis;
+
+    background: rgba(0, 0, 0, 0.65);
+
+    color: #ffffff;
+
+    border-radius: 3px;
+
+    font-size: 12px;
 
     pointer-events: none;
+
+    user-select: none;
 }
 
 
-/*
-============================================================
-SPEECH BUBBLE
-============================================================
-*/
+/* ============================================================
+   SPEECH BUBBLE
+   ============================================================ */
 
 .speechBubble {
     position: absolute;
 
     left: 50%;
 
-    bottom: 100%;
+    bottom: calc(100% + 28px);
 
-    transform: translateX(-50%);
+    transform:
+        translateX(-50%);
 
-    margin-bottom: 28px;
+    min-width: 40px;
 
     max-width: 250px;
 
-    padding: 8px 12px;
+    padding: 7px 10px;
 
-    background: white;
+    background: #ffffff;
 
-    color: black;
+    color: #000000;
 
-    border: 1px solid #555555;
+    border: 2px solid #000000;
 
     border-radius: 10px;
 
     font-size: 14px;
 
-    line-height: 1.3;
+    line-height: 1.25;
+
+    text-align: center;
 
     word-wrap: break-word;
 
     white-space: normal;
 
-    z-index: 20;
-
     pointer-events: none;
+
+    user-select: none;
+
+    z-index: 100;
 }
 
+
+/*
+Speech bubble tail.
+*/
 
 .speechBubble::after {
     content: "";
@@ -288,88 +309,46 @@ SPEECH BUBBLE
 
     top: 100%;
 
-    transform: translateX(-50%);
+    transform:
+        translateX(-50%);
+
+    width: 0;
+    height: 0;
 
     border-left: 7px solid transparent;
-
     border-right: 7px solid transparent;
 
-    border-top: 7px solid white;
+    border-top: 8px solid #000000;
 }
 
 
-/*
-============================================================
-TASKBAR
-============================================================
-*/
+.speechBubble::before {
+    content: "";
 
-#taskbar {
     position: absolute;
 
-    left: 0;
-    bottom: 0;
+    left: 50%;
 
-    width: 100%;
-    height: 50px;
+    top: calc(100% - 2px);
 
-    display: flex;
+    transform:
+        translateX(-50%);
 
-    padding: 4px;
+    width: 0;
+    height: 0;
 
-    background: #c0c0c0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
 
-    border-top: 2px solid #eeeeee;
+    border-top: 7px solid #ffffff;
 
-    z-index: 100;
+    z-index: 2;
 }
 
 
-#startButton {
-    width: 80px;
-
-    height: 42px;
-
-    flex-shrink: 0;
-
-    background: #c0c0c0;
-
-    border: 2px outset #eeeeee;
-
-    font-weight: bold;
-
-    cursor: pointer;
-}
-
-
-#startButton:active {
-    border-style: inset;
-}
-
-
-#messageInput {
-    flex: 1;
-
-    min-width: 0;
-
-    height: 42px;
-
-    margin-left: 4px;
-
-    padding: 0 10px;
-
-    font-size: 16px;
-
-    border: 2px inset #eeeeee;
-
-    outline: none;
-}
-
-/*
-============================================================
-SETTINGS BUTTON
-============================================================
-*/
+/* ============================================================
+   SETTINGS BUTTON
+   ============================================================ */
 
 #settingsButton {
     position: absolute;
@@ -381,7 +360,7 @@ SETTINGS BUTTON
 
     background: #c0c0c0;
 
-    color: black;
+    color: #000000;
 
     border: 2px outset #eeeeee;
 
@@ -389,7 +368,14 @@ SETTINGS BUTTON
 
     cursor: pointer;
 
+    user-select: none;
+
     z-index: 1000;
+}
+
+
+#settingsButton:hover {
+    background: #d0d0d0;
 }
 
 
@@ -398,11 +384,9 @@ SETTINGS BUTTON
 }
 
 
-/*
-============================================================
-SETTINGS PANEL
-============================================================
-*/
+/* ============================================================
+   SETTINGS PANEL
+   ============================================================ */
 
 #settingsPanel {
     position: absolute;
@@ -416,6 +400,8 @@ SETTINGS PANEL
 
     background: #c0c0c0;
 
+    color: #000000;
+
     border: 2px outset #eeeeee;
 
     box-shadow:
@@ -428,11 +414,11 @@ SETTINGS PANEL
 
 
 .settingsTitle {
-    font-weight: bold;
+    margin-bottom: 12px;
 
     font-size: 16px;
 
-    margin-bottom: 12px;
+    font-weight: bold;
 }
 
 
@@ -442,17 +428,30 @@ SETTINGS PANEL
     margin: 10px 0;
 
     cursor: pointer;
+
+    font-size: 14px;
+
+    user-select: none;
+}
+
+
+#settingsPanel input[type="radio"] {
+    margin-right: 7px;
+
+    cursor: pointer;
 }
 
 
 #settingsPanel button {
-    margin-top: 10px;
-
     width: 100%;
 
     height: 30px;
 
+    margin-top: 10px;
+
     background: #c0c0c0;
+
+    color: #000000;
 
     border: 2px outset #eeeeee;
 
@@ -460,6 +459,193 @@ SETTINGS PANEL
 }
 
 
+#settingsPanel button:hover {
+    background: #d0d0d0;
+}
+
+
 #settingsPanel button:active {
     border-style: inset;
 }
+
+
+/* ============================================================
+   TASKBAR
+   ============================================================ */
+
+#taskbar {
+    position: absolute;
+
+    left: 0;
+    bottom: 0;
+
+    width: 100%;
+
+    height: 48px;
+
+    display: flex;
+
+    align-items: center;
+
+    padding: 5px;
+
+    background: #c0c0c0;
+
+    border-top: 2px solid #eeeeee;
+
+    box-shadow:
+        0 -2px 4px rgba(0, 0, 0, 0.25);
+
+    z-index: 2000;
+}
+
+
+/* ============================================================
+   START / SEND BUTTON
+   ============================================================ */
+
+#startButton {
+    flex: 0 0 auto;
+
+    width: 75px;
+
+    height: 36px;
+
+    margin-right: 5px;
+
+    background: #c0c0c0;
+
+    color: #000000;
+
+    border: 2px outset #eeeeee;
+
+    font-size: 14px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+}
+
+
+#startButton:hover {
+    background: #d0d0d0;
+}
+
+
+#startButton:active {
+    border-style: inset;
+}
+
+
+/* ============================================================
+   MESSAGE INPUT
+   ============================================================ */
+
+#messageInput {
+    flex: 1;
+
+    width: 0;
+
+    height: 36px;
+
+    padding: 5px 8px;
+
+    background: #ffffff;
+
+    color: #000000;
+
+    border: 2px inset #eeeeee;
+
+    outline: none;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    font-size: 14px;
+}
+
+
+#messageInput:focus {
+    outline: 1px solid #000080;
+}
+
+
+/* ============================================================
+   AUDIO CONTAINER
+   ============================================================ */
+
+#audio {
+    position: absolute;
+
+    width: 0;
+    height: 0;
+
+    overflow: hidden;
+
+    left: -9999px;
+
+    top: -9999px;
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 600px) {
+
+    .loginBox {
+        width: calc(100% - 30px);
+
+        max-width: 320px;
+    }
+
+
+    .player {
+        width: 36px;
+        height: 36px;
+    }
+
+
+    .speechBubble {
+        max-width: 180px;
+
+        font-size: 13px;
+    }
+
+
+    #settingsButton {
+        top: 8px;
+        left: 8px;
+
+        padding: 7px 10px;
+    }
+
+
+    #settingsPanel {
+        top: 48px;
+        left: 8px;
+
+        width: 210px;
+    }
+
+
+    #taskbar {
+        height: 46px;
+    }
+
+
+    #startButton {
+        width: 65px;
+
+        height: 34px;
+    }
+
+
+    #messageInput {
+        height: 34px;
+    }
+}
+```
