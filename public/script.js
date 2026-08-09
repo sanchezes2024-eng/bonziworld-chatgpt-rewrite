@@ -830,7 +830,9 @@ SPEECH BUBBLE
 function showSpeechBubble(player, text) {
 
     const oldBubble =
-        player.element.querySelector(".speechBubble");
+        player.element.querySelector(
+            ".speechBubble"
+        );
 
 
     if (oldBubble) {
@@ -856,50 +858,88 @@ function showSpeechBubble(player, text) {
 
 
     /*
-        Speak the message
+    Check that speak.js loaded
     */
 
-    if (typeof speak === "function") {
-
-        speak(
-            text,
-            {
-                amplitude: 100,
-                pitch: 50,
-                speed: 175,
-                wordgap: 0
-            }
-        );
-
-    } else {
+    if (typeof speak !== "function") {
 
         console.log(
             "speak.js not loaded"
         );
-    }
 
-
-    /*
-        Remove bubble after speech time.
-        (fallback because old speak.js
-        does not provide onended)
-    */
-
-    const readingTime =
-        Math.max(
-            3000,
-            text.length * 80
-        );
-
-
-    setTimeout(
-        () => {
+        setTimeout(() => {
 
             if (bubble.parentNode) {
                 bubble.remove();
             }
 
-        },
-        readingTime
+        }, 5000);
+
+        return;
+    }
+
+
+    /*
+    Generate speech
+    */
+
+    speak(
+        text,
+        {
+            amplitude: 100,
+            pitch: 50,
+            speed: 170
+        }
     );
+
+
+    /*
+    Find generated audio
+    */
+
+    let checkAudio =
+        setInterval(() => {
+
+            const audio =
+                document.querySelector(
+                    "audio"
+                );
+
+
+            if (!audio) {
+                return;
+            }
+
+
+            clearInterval(
+                checkAudio
+            );
+
+
+            audio.onended = () => {
+
+                if (bubble.parentNode) {
+                    bubble.remove();
+                }
+
+            };
+
+
+        }, 100);
+
+
+    /*
+    Safety timeout
+    */
+
+    setTimeout(() => {
+
+        if (bubble.parentNode) {
+            bubble.remove();
+        }
+
+    }, Math.max(
+        5000,
+        text.length * 100
+    ));
 }
