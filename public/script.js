@@ -842,33 +842,60 @@ function showSpeechBubble(player, text) {
 
     player.element.appendChild(bubble);
 
-    // Create built-in browser speech
-    const utterance =
-        new SpeechSynthesisUtterance(text);
+    /*
+     * Make speak.js generate and play the speech.
+     */
 
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.volume = 1;
+    if (typeof speak === "function") {
+        speak(text, {
+            amplitude: 100,
+            pitch: 50,
+            speed: 175,
+            voice: "en/en-us"
+        });
+    } else {
+        console.error(
+            "speak.js was not loaded."
+        );
 
-    // Remove the bubble when the browser finishes speaking
-    utterance.onend = () => {
-        if (bubble.parentNode) {
+        return;
+    }
+
+    /*
+     * speak.js doesn't document an onended
+     * callback, so watch its generated audio.
+     */
+
+    const waitForAudio = setInterval(() => {
+        const audio =
+            document.querySelector("#audio audio");
+
+        if (!audio) {
+            return;
+        }
+
+        clearInterval(waitForAudio);
+
+        audio.onended = () => {
+            if (bubble.parentNode) {
+                bubble.remove();
+            }
+        };
+    }, 50);
+
+    /*
+     * Safety cleanup in case audio fails.
+     */
+
+    setTimeout(() => {
+        clearInterval(waitForAudio);
+
+        if (
+            bubble.parentNode &&
+            (!document.querySelector("#audio audio") ||
+             document.querySelector("#audio audio").ended)
+        ) {
             bubble.remove();
         }
-    };
-
-    // Show errors in the browser console
-    utterance.onerror = (event) => {
-        console.error("TTS error:", event.error);
-
-        if (bubble.parentNode) {
-            bubble.remove();
-        }
-    };
-
-    // Stop anything currently speaking
-    window.speechSynthesis.cancel();
-
-    // Speak the message
-    window.speechSynthesis.speak(utterance);
+    }, Math.max(10000, text.length * 200));
 }
