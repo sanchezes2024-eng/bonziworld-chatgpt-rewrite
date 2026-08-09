@@ -35,7 +35,7 @@ const server = http.createServer((req, res) => {
         const contentTypes = {
             ".html": "text/html",
             ".css": "text/css",
-            ".js": "application/javascript"
+            ".js": "application/javascript",
             ".png": "image/png"
         };
 
