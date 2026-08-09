@@ -1,7 +1,7 @@
+```css
 * {
     box-sizing: border-box;
 }
-
 
 html,
 body {
@@ -39,7 +39,6 @@ LOGIN
     background: #202020;
 }
 
-
 .loginBox {
     width: 320px;
 
@@ -59,13 +58,11 @@ LOGIN
     gap: 12px;
 }
 
-
 .loginBox h1 {
     margin: 0 0 10px 0;
 
     text-align: center;
 }
-
 
 .loginBox input {
     width: 100%;
@@ -81,11 +78,9 @@ LOGIN
     outline: none;
 }
 
-
 .loginBox input:focus {
     border-color: #444444;
 }
-
 
 .loginBox button {
     width: 100%;
@@ -100,7 +95,6 @@ LOGIN
 
     cursor: pointer;
 }
-
 
 .loginBox button:active {
     border-style: inset;
@@ -125,10 +119,14 @@ DESKTOP
     display: none;
 
     background-image: url("/background.png");
+
     background-size: cover;
+
     background-position: center;
+
     background-repeat: no-repeat;
 }
+
 
 /*
 ============================================================
@@ -146,6 +144,16 @@ WORLD
     height: calc(100% - 50px);
 
     overflow: hidden;
+
+    /*
+    Important for pointer dragging.
+    */
+
+    touch-action: none;
+
+    user-select: none;
+
+    -webkit-user-select: none;
 }
 
 
@@ -169,6 +177,8 @@ PLAYERS
 
     user-select: none;
 
+    -webkit-user-select: none;
+
     touch-action: none;
 
     z-index: 5;
@@ -181,8 +191,25 @@ ONLY YOUR PLAYER IS DRAGGABLE
 
 .player.myPlayer {
     cursor: grab;
-}
 
+    /*
+    Prevent the browser from treating
+    dragging as text selection.
+    */
+
+    user-select: none;
+
+    -webkit-user-select: none;
+
+    touch-action: none;
+
+    /*
+    Make sure your player receives
+    pointer events.
+    */
+
+    pointer-events: auto;
+}
 
 .player.myPlayer:active {
     cursor: grabbing;
@@ -197,9 +224,7 @@ OTHER PLAYERS
     cursor: default;
 
     /*
-    This makes it impossible to
-    accidentally treat them as
-    draggable UI.
+    Other players cannot be dragged.
     */
 
     pointer-events: none;
@@ -233,6 +258,10 @@ PLAYER NAME
         1px 1px 2px black;
 
     pointer-events: none;
+
+    user-select: none;
+
+    -webkit-user-select: none;
 }
 
 
@@ -276,8 +305,11 @@ SPEECH BUBBLE
     z-index: 20;
 
     pointer-events: none;
-}
 
+    user-select: none;
+
+    -webkit-user-select: none;
+}
 
 .speechBubble::after {
     content: "";
@@ -324,7 +356,6 @@ TASKBAR
     z-index: 100;
 }
 
-
 #startButton {
     width: 80px;
 
@@ -341,11 +372,9 @@ TASKBAR
     cursor: pointer;
 }
 
-
 #startButton:active {
     border-style: inset;
 }
-
 
 #messageInput {
     flex: 1;
@@ -364,6 +393,7 @@ TASKBAR
 
     outline: none;
 }
+
 
 /*
 ============================================================
@@ -390,8 +420,11 @@ SETTINGS BUTTON
     cursor: pointer;
 
     z-index: 1000;
-}
 
+    user-select: none;
+
+    -webkit-user-select: none;
+}
 
 #settingsButton:active {
     border-style: inset;
@@ -426,7 +459,6 @@ SETTINGS PANEL
     z-index: 1001;
 }
 
-
 .settingsTitle {
     font-weight: bold;
 
@@ -435,7 +467,6 @@ SETTINGS PANEL
     margin-bottom: 12px;
 }
 
-
 #settingsPanel label {
     display: block;
 
@@ -443,7 +474,6 @@ SETTINGS PANEL
 
     cursor: pointer;
 }
-
 
 #settingsPanel button {
     margin-top: 10px;
@@ -459,23 +489,7 @@ SETTINGS PANEL
     cursor: pointer;
 }
 
-
 #settingsPanel button:active {
     border-style: inset;
 }
-
-.player {
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
-    cursor: grab;
-}
-
-.player:active {
-    cursor: grabbing;
-}
-
-.playerName,
-.speechBubble {
-    pointer-events: none;
-}
+```
