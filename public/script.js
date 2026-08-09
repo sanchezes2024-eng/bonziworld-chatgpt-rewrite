@@ -828,118 +828,47 @@ SPEECH BUBBLE
 */
 
 function showSpeechBubble(player, text) {
-
     const oldBubble =
-        player.element.querySelector(
-            ".speechBubble"
-        );
-
+        player.element.querySelector(".speechBubble");
 
     if (oldBubble) {
         oldBubble.remove();
     }
 
+    const bubble = document.createElement("div");
 
-    const bubble =
-        document.createElement("div");
+    bubble.className = "speechBubble";
+    bubble.textContent = text;
 
+    player.element.appendChild(bubble);
 
-    bubble.className =
-        "speechBubble";
+    // Create built-in browser speech
+    const utterance =
+        new SpeechSynthesisUtterance(text);
 
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    utterance.volume = 1;
 
-    bubble.textContent =
-        text;
-
-
-    player.element.appendChild(
-        bubble
-    );
-
-
-    /*
-    Check that speak.js loaded
-    */
-
-    if (typeof speak !== "function") {
-
-        console.log(
-            "speak.js not loaded"
-        );
-
-        setTimeout(() => {
-
-            if (bubble.parentNode) {
-                bubble.remove();
-            }
-
-        }, 5000);
-
-        return;
-    }
-
-
-    /*
-    Generate speech
-    */
-
-    speak(
-        text,
-        {
-            amplitude: 100,
-            pitch: 50,
-            speed: 170
+    // Remove the bubble when the browser finishes speaking
+    utterance.onend = () => {
+        if (bubble.parentNode) {
+            bubble.remove();
         }
-    );
+    };
 
-
-    /*
-    Find generated audio
-    */
-
-    let checkAudio =
-        setInterval(() => {
-
-            const audio =
-                document.querySelector(
-                    "audio"
-                );
-
-
-            if (!audio) {
-                return;
-            }
-
-
-            clearInterval(
-                checkAudio
-            );
-
-
-            audio.onended = () => {
-
-                if (bubble.parentNode) {
-                    bubble.remove();
-                }
-
-            };
-
-
-        }, 100);
-
-
-    /*
-    Safety timeout
-    */
-
-    setTimeout(() => {
+    // Show errors in the browser console
+    utterance.onerror = (event) => {
+        console.error("TTS error:", event.error);
 
         if (bubble.parentNode) {
             bubble.remove();
         }
+    };
 
-    }, Math.max(
-        5000,
-        text.length * 100
-    ));
+    // Stop anything currently speaking
+    window.speechSynthesis.cancel();
+
+    // Speak the message
+    window.speechSynthesis.speak(utterance);
 }
