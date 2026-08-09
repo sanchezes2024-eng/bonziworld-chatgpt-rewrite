@@ -1,4 +1,4 @@
-```css
+
 * {
     box-sizing: border-box;
 }
@@ -181,9 +181,16 @@ PLAYERS
 
     touch-action: none;
 
+    cursor: grab;
+
+    pointer-events: auto;
+
     z-index: 5;
 }
 
+.player:active {
+    cursor: grabbing;
+}
 
 /*
 ONLY YOUR PLAYER IS DRAGGABLE
@@ -227,7 +234,7 @@ OTHER PLAYERS
     Other players cannot be dragged.
     */
 
-    pointer-events: none;
+    
 }
 
 
@@ -492,4 +499,4 @@ SETTINGS PANEL
 #settingsPanel button:active {
     border-style: inset;
 }
-```
+
