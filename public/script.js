@@ -828,35 +828,78 @@ SPEECH BUBBLE
 */
 
 function showSpeechBubble(player, text) {
+
     const oldBubble =
         player.element.querySelector(".speechBubble");
+
 
     if (oldBubble) {
         oldBubble.remove();
     }
 
+
     const bubble =
         document.createElement("div");
 
-    bubble.className = "speechBubble";
-    bubble.textContent = text;
 
-    player.element.appendChild(bubble);
+    bubble.className =
+        "speechBubble";
+
+
+    bubble.textContent =
+        text;
+
+
+    player.element.appendChild(
+        bubble
+    );
+
 
     /*
-     * Speak the message.
-     *
-     * The callback runs when speak.js
-     * finishes reading it.
-     */
+        Speak the message
+    */
 
-    speak.play(
-        text,
-        {},
+    if (typeof speak === "function") {
+
+        speak(
+            text,
+            {
+                amplitude: 100,
+                pitch: 50,
+                speed: 175,
+                wordgap: 0
+            }
+        );
+
+    } else {
+
+        console.log(
+            "speak.js not loaded"
+        );
+    }
+
+
+    /*
+        Remove bubble after speech time.
+        (fallback because old speak.js
+        does not provide onended)
+    */
+
+    const readingTime =
+        Math.max(
+            3000,
+            text.length * 80
+        );
+
+
+    setTimeout(
         () => {
+
             if (bubble.parentNode) {
                 bubble.remove();
             }
-        }
+
+        },
+        readingTime
     );
 }
