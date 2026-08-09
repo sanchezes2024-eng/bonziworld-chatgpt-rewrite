@@ -500,3 +500,23 @@ SETTINGS PANEL
     border-style: inset;
 }
 
+#readmeLink {
+    position: fixed;
+
+    right: 12px;
+    bottom: 10px;
+
+    color: #ffffff;
+
+    font-size: 13px;
+
+    text-decoration: underline;
+
+    cursor: pointer;
+
+    z-index: 100;
+}
+
+#readmeLink:hover {
+    color: #cccccc;
+}
