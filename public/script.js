@@ -336,178 +336,99 @@ DRAGGING
 */
 
 function setupDragging(player) {
-
     let dragging = false;
 
-    let offsetX = 0;
+    player.element.style.cursor = "grab";
+    player.element.style.touchAction = "none";
+    player.element.style.userSelect = "none";
 
-    let offsetY = 0;
+    player.element.addEventListener("pointerdown", (event) => {
+        // Only allow YOUR player to be dragged.
+        if (player.id !== myId) {
+            return;
+        }
 
+        dragging = true;
 
-    player.element.style.cursor =
-        "grab";
+        player.element.style.cursor = "grabbing";
 
+        try {
+            player.element.setPointerCapture(event.pointerId);
+        } catch (error) {
+            console.log("Pointer capture unavailable.");
+        }
 
-    player.element.addEventListener(
-        "pointerdown",
-        (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+    });
 
-            /*
-            This is your player,
-            so dragging is allowed.
-            */
+    player.element.addEventListener("pointermove", (event) => {
+        if (!dragging) {
+            return;
+        }
 
-            dragging = true;
+        const rect = world.getBoundingClientRect();
 
+        // Convert mouse position to percentage of the world.
+        let x =
+            ((event.clientX - rect.left) / rect.width) * 100;
 
-            player.element.setPointerCapture(
+        let y =
+            ((event.clientY - rect.top) / rect.height) * 100;
+
+        // Keep the character inside the world.
+        x = Math.max(2, Math.min(98, x));
+        y = Math.max(2, Math.min(95, y));
+
+        player.x = x;
+        player.y = y;
+
+        player.element.style.left = `${x}%`;
+        player.element.style.top = `${y}%`;
+
+        // Synchronize with everyone else.
+        socket.emit("move", {
+            x: x,
+            y: y
+        });
+
+        event.preventDefault();
+    });
+
+    function stopDragging(event) {
+        if (!dragging) {
+            return;
+        }
+
+        dragging = false;
+
+        player.element.style.cursor = "grab";
+
+        try {
+            player.element.releasePointerCapture(
                 event.pointerId
             );
-
-
-            player.element.style.cursor =
-                "grabbing";
-
-
-            const rect =
-                player.element.getBoundingClientRect();
-
-
-            offsetX =
-                event.clientX -
-                (
-                    rect.left +
-                    rect.width / 2
-                );
-
-
-            offsetY =
-                event.clientY -
-                (
-                    rect.top +
-                    rect.height / 2
-                );
-
-
-            event.preventDefault();
+        } catch (error) {
+            // Pointer capture may already be released.
         }
-    );
-
-
-    player.element.addEventListener(
-        "pointermove",
-        (event) => {
-
-            if (!dragging) {
-                return;
-            }
-
-
-            const worldRect =
-                world.getBoundingClientRect();
-
-
-            let x =
-                (
-                    event.clientX -
-                    worldRect.left -
-                    offsetX
-                ) /
-                worldRect.width *
-                100;
-
-
-            let y =
-                (
-                    event.clientY -
-                    worldRect.top -
-                    offsetY
-                ) /
-                worldRect.height *
-                100;
-
-
-            /*
-            Keep inside world.
-            */
-
-            x =
-                Math.max(
-                    2,
-                    Math.min(
-                        98,
-                        x
-                    )
-                );
-
-
-            y =
-                Math.max(
-                    5,
-                    Math.min(
-                        95,
-                        y
-                    )
-                );
-
-
-            player.x =
-                x;
-
-            player.y =
-                y;
-
-
-            player.element.style.left =
-                `${x}%`;
-
-            player.element.style.top =
-                `${y}%`;
-
-
-            /*
-            Send position to server.
-            */
-
-            socket.emit(
-                "move",
-                {
-                    x:
-                        x,
-
-                    y:
-                        y
-                }
-            );
-        }
-    );
-
-
-    const stopDragging =
-        () => {
-
-            if (!dragging) {
-                return;
-            }
-
-
-            dragging = false;
-
-
-            player.element.style.cursor =
-                "grab";
-        };
-
+    }
 
     player.element.addEventListener(
         "pointerup",
         stopDragging
     );
 
-
     player.element.addEventListener(
         "pointercancel",
         stopDragging
+    );
+
+    player.element.addEventListener(
+        "lostpointercapture",
+        () => {
+            dragging = false;
+            player.element.style.cursor = "grab";
+        }
     );
 }
 
