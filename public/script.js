@@ -827,63 +827,36 @@ SPEECH BUBBLE
 ============================================================
 */
 
-function showSpeechBubble(
-    player,
-    text
-) {
-
-    /*
-    Remove old bubble.
-    */
-
+function showSpeechBubble(player, text) {
     const oldBubble =
-        player.element.querySelector(
-            ".speechBubble"
-        );
-
+        player.element.querySelector(".speechBubble");
 
     if (oldBubble) {
-
         oldBubble.remove();
     }
 
-
-    /*
-    Create bubble.
-    */
-
     const bubble =
-        document.createElement(
-            "div"
-        );
+        document.createElement("div");
 
+    bubble.className = "speechBubble";
+    bubble.textContent = text;
 
-    bubble.className =
-        "speechBubble";
-
-
-    bubble.textContent =
-        text;
-
-
-    player.element.appendChild(
-        bubble
-    );
-
+    player.element.appendChild(bubble);
 
     /*
-    Remove after 5 seconds.
-    */
+     * Speak the message.
+     *
+     * The callback runs when speak.js
+     * finishes reading it.
+     */
 
-    setTimeout(
+    speak.play(
+        text,
+        {},
         () => {
-
             if (bubble.parentNode) {
-
                 bubble.remove();
             }
-
-        },
-        5000
+        }
     );
 }
