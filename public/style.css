@@ -364,3 +364,102 @@ TASKBAR
 
     outline: none;
 }
+
+/*
+============================================================
+SETTINGS BUTTON
+============================================================
+*/
+
+#settingsButton {
+    position: absolute;
+
+    top: 10px;
+    right: 10px;
+
+    padding: 8px 12px;
+
+    background: #c0c0c0;
+
+    color: black;
+
+    border: 2px outset #eeeeee;
+
+    font-size: 14px;
+
+    cursor: pointer;
+
+    z-index: 1000;
+}
+
+
+#settingsButton:active {
+    border-style: inset;
+}
+
+
+/*
+============================================================
+SETTINGS PANEL
+============================================================
+*/
+
+#settingsPanel {
+    position: absolute;
+
+    top: 50px;
+    right: 10px;
+
+    width: 230px;
+
+    padding: 15px;
+
+    background: #c0c0c0;
+
+    border: 2px outset #eeeeee;
+
+    box-shadow:
+        4px 4px 10px rgba(0, 0, 0, 0.4);
+
+    display: none;
+
+    z-index: 1001;
+}
+
+
+.settingsTitle {
+    font-weight: bold;
+
+    font-size: 16px;
+
+    margin-bottom: 12px;
+}
+
+
+#settingsPanel label {
+    display: block;
+
+    margin: 10px 0;
+
+    cursor: pointer;
+}
+
+
+#settingsPanel button {
+    margin-top: 10px;
+
+    width: 100%;
+
+    height: 30px;
+
+    background: #c0c0c0;
+
+    border: 2px outset #eeeeee;
+
+    cursor: pointer;
+}
+
+
+#settingsPanel button:active {
+    border-style: inset;
+}
