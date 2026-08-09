@@ -14,6 +14,8 @@ const server = http.createServer((req, res) => {
         filePath = path.join(__dirname, "public", "style.css");
     } else if (req.url === "/script.js") {
         filePath = path.join(__dirname, "public", "script.js");
+    } else if (req.url === "/background.png") {
+        filePath = path.join(__dirname, "public", "background.png");
     } else {
         res.writeHead(404);
         res.end("Not Found");
@@ -34,6 +36,7 @@ const server = http.createServer((req, res) => {
             ".html": "text/html",
             ".css": "text/css",
             ".js": "application/javascript"
+            ".png": "image/png"
         };
 
         const contentType =
