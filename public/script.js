@@ -1,3 +1,4 @@
+
 const socket = io();
 
 
@@ -8,37 +9,66 @@ ELEMENTS
 */
 
 const loginScreen =
-    document.getElementById("loginScreen");
+    document.getElementById(
+        "loginScreen"
+    );
 
 const desktop =
-    document.getElementById("desktop");
-
-const world =
-    document.getElementById("world");
+    document.getElementById(
+        "desktop"
+    );
 
 const nameInput =
-    document.getElementById("nameInput");
+    document.getElementById(
+        "nameInput"
+    );
 
 const roomInput =
-    document.getElementById("roomInput");
+    document.getElementById(
+        "roomInput"
+    );
 
 const submitButton =
-    document.getElementById("submitButton");
+    document.getElementById(
+        "submitButton"
+    );
+
+const world =
+    document.getElementById(
+        "world"
+    );
 
 const messageInput =
-    document.getElementById("messageInput");
+    document.getElementById(
+        "messageInput"
+    );
 
 const startButton =
-    document.getElementById("startButton");
+    document.getElementById(
+        "startButton"
+    );
+
+
+/*
+============================================================
+SETTINGS ELEMENTS
+============================================================
+*/
 
 const settingsButton =
-    document.getElementById("settingsButton");
+    document.getElementById(
+        "settingsButton"
+    );
 
 const settingsPanel =
-    document.getElementById("settingsPanel");
+    document.getElementById(
+        "settingsPanel"
+    );
 
 const closeSettings =
-    document.getElementById("closeSettings");
+    document.getElementById(
+        "closeSettings"
+    );
 
 const ttsOptions =
     document.querySelectorAll(
@@ -47,8 +77,38 @@ const ttsOptions =
 
 
 let ttsMode =
-    localStorage.getItem("ttsMode") ||
-    "browser";
+    localStorage.getItem(
+        "ttsMode"
+    ) || "browser";
+
+
+/*
+============================================================
+PLAYER DATA
+============================================================
+*/
+
+const players = {};
+
+let myId = null;
+
+let myName = "";
+
+let currentRoom = "default";
+
+
+/*
+============================================================
+DEFAULT ROOM
+============================================================
+*/
+
+if (roomInput) {
+
+    roomInput.value =
+        "default";
+}
+
 
 /*
 ============================================================
@@ -56,112 +116,400 @@ SETTINGS
 ============================================================
 */
 
-settingsButton.addEventListener(
-    "click",
-    () => {
+if (settingsButton) {
 
-        if (
-            settingsPanel.style.display ===
-            "block"
-        ) {
+    settingsButton.addEventListener(
+        "click",
+        () => {
+
+            if (
+                settingsPanel.style.display ===
+                "block"
+            ) {
+
+                settingsPanel.style.display =
+                    "none";
+
+            } else {
+
+                settingsPanel.style.display =
+                    "block";
+            }
+        }
+    );
+}
+
+
+if (closeSettings) {
+
+    closeSettings.addEventListener(
+        "click",
+        () => {
 
             settingsPanel.style.display =
                 "none";
-
-        } else {
-
-            settingsPanel.style.display =
-                "block";
         }
-    }
-);
+    );
+}
 
 
-closeSettings.addEventListener(
-    "click",
-    () => {
+/*
+Set saved TTS option.
+*/
 
-        settingsPanel.style.display =
-            "none";
+ttsOptions.forEach(
+    (option) => {
+
+        option.checked =
+            option.value ===
+            ttsMode;
+
+
+        option.addEventListener(
+            "change",
+            () => {
+
+                if (
+                    !option.checked
+                ) {
+                    return;
+                }
+
+
+                ttsMode =
+                    option.value;
+
+
+                localStorage.setItem(
+                    "ttsMode",
+                    ttsMode
+                );
+
+
+                /*
+                Stop browser TTS
+                when switching away.
+                */
+
+                if (
+                    window.speechSynthesis
+                ) {
+
+                    window.speechSynthesis.cancel();
+                }
+            }
+        );
     }
 );
 
 
 /*
-Set the saved radio button.
+============================================================
+CREATE PLAYER
+============================================================
 */
 
-ttsOptions.forEach((option) => {
+function createPlayer(data) {
 
-    option.checked =
-        option.value === ttsMode;
+    /*
+    Don't create duplicates.
+    */
+
+    if (
+        players[data.id]
+    ) {
+        return players[data.id];
+    }
 
 
-    option.addEventListener(
-        "change",
-        () => {
+    const element =
+        document.createElement(
+            "div"
+        );
 
-            if (!option.checked) {
+
+    element.className =
+        "player";
+
+
+    element.dataset.id =
+        data.id;
+
+
+    /*
+    Player name.
+    */
+
+    const nameLabel =
+        document.createElement(
+            "div"
+        );
+
+
+    nameLabel.className =
+        "playerName";
+
+
+    nameLabel.textContent =
+        data.name;
+
+
+    element.appendChild(
+        nameLabel
+    );
+
+
+    /*
+    Position.
+    */
+
+    element.style.left =
+        `${data.x}%`;
+
+    element.style.top =
+        `${data.y}%`;
+
+
+    /*
+    Color.
+    */
+
+    element.style.backgroundColor =
+        data.color ||
+        "#8000ff";
+
+
+    world.appendChild(
+        element
+    );
+
+
+    const player = {
+
+        id:
+            data.id,
+
+        name:
+            data.name,
+
+        x:
+            data.x,
+
+        y:
+            data.y,
+
+        color:
+            data.color ||
+            "#8000ff",
+
+        element:
+            element
+    };
+
+
+    players[data.id] =
+        player;
+
+
+    /*
+    Only YOUR player can be dragged.
+    */
+
+    if (
+        data.id === myId
+    ) {
+
+        setupDragging(
+            player
+        );
+    }
+
+
+    return player;
+}
+
+
+/*
+============================================================
+DRAGGING
+============================================================
+*/
+
+function setupDragging(player) {
+
+    let dragging = false;
+
+    let offsetX = 0;
+
+    let offsetY = 0;
+
+
+    player.element.style.cursor =
+        "grab";
+
+
+    player.element.addEventListener(
+        "pointerdown",
+        (event) => {
+
+            /*
+            This is your player,
+            so dragging is allowed.
+            */
+
+            dragging = true;
+
+
+            player.element.setPointerCapture(
+                event.pointerId
+            );
+
+
+            player.element.style.cursor =
+                "grabbing";
+
+
+            const rect =
+                player.element.getBoundingClientRect();
+
+
+            offsetX =
+                event.clientX -
+                (
+                    rect.left +
+                    rect.width / 2
+                );
+
+
+            offsetY =
+                event.clientY -
+                (
+                    rect.top +
+                    rect.height / 2
+                );
+
+
+            event.preventDefault();
+        }
+    );
+
+
+    player.element.addEventListener(
+        "pointermove",
+        (event) => {
+
+            if (!dragging) {
                 return;
             }
 
 
-            ttsMode =
-                option.value;
+            const worldRect =
+                world.getBoundingClientRect();
 
 
-            localStorage.setItem(
-                "ttsMode",
-                ttsMode
-            );
+            let x =
+                (
+                    event.clientX -
+                    worldRect.left -
+                    offsetX
+                ) /
+                worldRect.width *
+                100;
+
+
+            let y =
+                (
+                    event.clientY -
+                    worldRect.top -
+                    offsetY
+                ) /
+                worldRect.height *
+                100;
 
 
             /*
-            Stop currently playing speech
-            when switching modes.
+            Keep inside world.
             */
 
-            if (
-                window.speechSynthesis
-            ) {
+            x =
+                Math.max(
+                    2,
+                    Math.min(
+                        98,
+                        x
+                    )
+                );
 
-                window.speechSynthesis.cancel();
-            }
+
+            y =
+                Math.max(
+                    5,
+                    Math.min(
+                        95,
+                        y
+                    )
+                );
+
+
+            player.x =
+                x;
+
+            player.y =
+                y;
+
+
+            player.element.style.left =
+                `${x}%`;
+
+            player.element.style.top =
+                `${y}%`;
+
+
+            /*
+            Send position to server.
+            */
+
+            socket.emit(
+                "move",
+                {
+                    x:
+                        x,
+
+                    y:
+                        y
+                }
+            );
         }
     );
-});
-
-/*
-============================================================
-CURRENT USER
-============================================================
-*/
-
-let myId = null;
-
-let myName = null;
-
-let myRoom = null;
 
 
-/*
-============================================================
-PLAYERS
-============================================================
-*/
+    const stopDragging =
+        () => {
 
-const players = {};
+            if (!dragging) {
+                return;
+            }
 
 
-/*
-============================================================
-DRAG STATE
-============================================================
-*/
+            dragging = false;
 
-let dragging = false;
 
-let dragPointerId = null;
+            player.element.style.cursor =
+                "grab";
+        };
+
+
+    player.element.addEventListener(
+        "pointerup",
+        stopDragging
+    );
+
+
+    player.element.addEventListener(
+        "pointercancel",
+        stopDragging
+    );
+}
 
 
 /*
@@ -170,9 +518,49 @@ LOGIN
 ============================================================
 */
 
+function joinRoom() {
+
+    let name =
+        nameInput.value.trim();
+
+
+    let room =
+        roomInput.value.trim();
+
+
+    if (!name) {
+        name = "Anonymous";
+    }
+
+
+    if (!room) {
+        room = "default";
+    }
+
+
+    myName =
+        name;
+
+    currentRoom =
+        room;
+
+
+    socket.emit(
+        "joinRoom",
+        {
+            name:
+                name,
+
+            room:
+                room
+        }
+    );
+}
+
+
 submitButton.addEventListener(
     "click",
-    join
+    joinRoom
 );
 
 
@@ -180,10 +568,13 @@ nameInput.addEventListener(
     "keydown",
     (event) => {
 
-        if (event.key === "Enter") {
-            join();
-        }
+        if (
+            event.key ===
+            "Enter"
+        ) {
 
+            joinRoom();
+        }
     }
 );
 
@@ -192,48 +583,15 @@ roomInput.addEventListener(
     "keydown",
     (event) => {
 
-        if (event.key === "Enter") {
-            join();
-        }
+        if (
+            event.key ===
+            "Enter"
+        ) {
 
+            joinRoom();
+        }
     }
 );
-
-
-function join() {
-
-    const name =
-        nameInput.value.trim();
-
-    let room =
-        roomInput.value.trim();
-
-
-    if (!name) {
-
-        nameInput.focus();
-
-        return;
-    }
-
-
-    if (!room) {
-
-        room = "default";
-
-        roomInput.value =
-            "default";
-    }
-
-
-    socket.emit(
-        "joinRoom",
-        {
-            name: name,
-            room: room
-        }
-    );
-}
 
 
 /*
@@ -249,38 +607,37 @@ socket.on(
         myId =
             data.id;
 
-        myName =
-            data.name;
 
-        myRoom =
-            data.room;
-
+        /*
+        Hide login.
+        */
 
         loginScreen.style.display =
             "none";
 
 
+        /*
+        Show desktop.
+        */
+
         desktop.style.display =
             "block";
 
 
+        /*
+        Create ourselves.
+        */
+
         createPlayer(
-            data.id,
-            data.name,
-            data.x,
-            data.y,
-            true
+            data
         );
-
-
-        messageInput.focus();
     }
 );
 
 
 /*
 ============================================================
-NEW PLAYER
+PLAYER JOINED
 ============================================================
 */
 
@@ -288,22 +645,8 @@ socket.on(
     "playerJoined",
     (data) => {
 
-        /*
-        Never create ourselves
-        as another player.
-        */
-
-        if (data.id === myId) {
-            return;
-        }
-
-
         createPlayer(
-            data.id,
-            data.name,
-            data.x,
-            data.y,
-            false
+            data
         );
     }
 );
@@ -311,452 +654,7 @@ socket.on(
 
 /*
 ============================================================
-CREATE PLAYER
-============================================================
-*/
-
-function createPlayer(
-    id,
-    name,
-    x,
-    y,
-    isMe
-) {
-
-    /*
-    Already exists.
-    */
-
-    if (players[id]) {
-        return;
-    }
-
-
-    /*
-    Create square.
-    */
-
-    const element =
-        document.createElement(
-            "div"
-        );
-
-
-    element.className =
-        "player";
-
-
-    /*
-    Give the element its owner's
-    Socket.IO ID.
-    */
-
-    element.dataset.playerId =
-        id;
-
-
-    /*
-    ONLY OUR PLAYER receives
-    the myPlayer class.
-    */
-
-    if (isMe) {
-
-        element.classList.add(
-            "myPlayer"
-        );
-    }
-
-
-    /*
-    Name label.
-    */
-
-    const nameElement =
-        document.createElement(
-            "div"
-        );
-
-
-    nameElement.className =
-        "playerName";
-
-
-    nameElement.textContent =
-        name;
-
-
-    element.appendChild(
-        nameElement
-    );
-
-
-    /*
-    Add player to world.
-    */
-
-    world.appendChild(
-        element
-    );
-
-
-    /*
-    Store player.
-    */
-
-    const player = {
-
-        element: element,
-
-        name: name,
-
-        x: Number(x) || 50,
-
-        y: Number(y) || 50,
-
-        isMe: isMe
-    };
-
-
-    players[id] =
-        player;
-
-
-    /*
-    Set position.
-    */
-
-    updatePlayerPosition(
-        player
-    );
-
-
-    /*
-    ========================================================
-    IMPORTANT:
-    ONLY OUR CHARACTER GETS A DRAG HANDLER.
-    ========================================================
-    */
-
-    if (isMe) {
-
-        element.addEventListener(
-            "pointerdown",
-            startDragging
-        );
-
-    } else {
-
-        /*
-        Other players cannot receive
-        pointer interaction.
-        */
-
-        element.style.pointerEvents =
-            "none";
-    }
-}
-
-
-/*
-============================================================
-POSITION
-============================================================
-*/
-
-function updatePlayerPosition(
-    player
-) {
-
-    player.element.style.left =
-        `${player.x}%`;
-
-    player.element.style.top =
-        `${player.y}%`;
-}
-
-
-/*
-============================================================
-START DRAGGING
-============================================================
-*/
-
-function startDragging(event) {
-
-    event.preventDefault();
-
-    event.stopPropagation();
-
-
-    /*
-    Get the element that was clicked.
-    */
-
-    const element =
-        event.currentTarget;
-
-
-    /*
-    Read its owner ID.
-    */
-
-    const ownerId =
-        element.dataset.playerId;
-
-
-    /*
-    HARD SECURITY CHECK:
-    It must belong to us.
-    */
-
-    if (ownerId !== myId) {
-
-        return;
-    }
-
-
-    /*
-    Make sure our player exists.
-    */
-
-    const player =
-        players[myId];
-
-
-    if (!player) {
-
-        return;
-    }
-
-
-    /*
-    Extra check.
-    */
-
-    if (!player.isMe) {
-
-        return;
-    }
-
-
-    /*
-    Start dragging.
-    */
-
-    dragging = true;
-
-    dragPointerId =
-        event.pointerId;
-
-
-    /*
-    Capture the pointer.
-    */
-
-    element.setPointerCapture(
-        event.pointerId
-    );
-
-
-    element.style.cursor =
-        "grabbing";
-}
-
-
-/*
-============================================================
-DRAG PLAYER
-============================================================
-*/
-
-document.addEventListener(
-    "pointermove",
-    (event) => {
-
-        /*
-        Not dragging.
-        */
-
-        if (!dragging) {
-
-            return;
-        }
-
-
-        /*
-        Only process the pointer
-        that started the drag.
-        */
-
-        if (
-            event.pointerId !==
-            dragPointerId
-        ) {
-
-            return;
-        }
-
-
-        /*
-        Get OUR player.
-        */
-
-        const player =
-            players[myId];
-
-
-        if (!player) {
-
-            dragging = false;
-
-            return;
-        }
-
-
-        /*
-        Extra ownership check.
-        */
-
-        if (
-            player.element.dataset.playerId !==
-            myId
-        ) {
-
-            dragging = false;
-
-            return;
-        }
-
-
-        /*
-        Get world dimensions.
-        */
-
-        const worldRect =
-            world.getBoundingClientRect();
-
-
-        /*
-        Convert mouse coordinates
-        to percentages.
-        */
-
-        let x =
-            (
-                event.clientX -
-                worldRect.left
-            )
-            /
-            worldRect.width
-            *
-            100;
-
-
-        let y =
-            (
-                event.clientY -
-                worldRect.top
-            )
-            /
-            worldRect.height
-            *
-            100;
-
-
-        /*
-        Keep the player inside
-        the world.
-        */
-
-        x =
-            Math.max(
-                5,
-                Math.min(95, x)
-            );
-
-
-        y =
-            Math.max(
-                5,
-                Math.min(95, y)
-            );
-
-
-        /*
-        Update our local position.
-        */
-
-        player.x = x;
-
-        player.y = y;
-
-
-        updatePlayerPosition(
-            player
-        );
-
-
-        /*
-        Send movement to server.
-        */
-
-        socket.emit(
-            "move",
-            {
-                x: x,
-                y: y
-            }
-        );
-    }
-);
-
-
-/*
-============================================================
-STOP DRAGGING
-============================================================
-*/
-
-document.addEventListener(
-    "pointerup",
-    (event) => {
-
-        if (!dragging) {
-            return;
-        }
-
-
-        if (
-            event.pointerId !==
-            dragPointerId
-        ) {
-
-            return;
-        }
-
-
-        dragging = false;
-
-        dragPointerId = null;
-
-
-        const player =
-            players[myId];
-
-
-        if (player) {
-
-            player.element.style.cursor =
-                "grab";
-        }
-    }
-);
-
-
-/*
-============================================================
-PLAYER MOVEMENT FROM SERVER
+PLAYER MOVED
 ============================================================
 */
 
@@ -764,48 +662,56 @@ socket.on(
     "playerMoved",
     (data) => {
 
-        /*
-        Ignore our own movement.
-        */
+        const player =
+            players[data.id];
 
-        if (data.id === myId) {
 
+        if (!player) {
             return;
         }
 
 
-        /*
-        Find the other player.
-        */
+        player.x =
+            data.x;
+
+        player.y =
+            data.y;
+
+
+        player.element.style.left =
+            `${data.x}%`;
+
+        player.element.style.top =
+            `${data.y}%`;
+    }
+);
+
+
+/*
+============================================================
+PLAYER COLOR CHANGED
+============================================================
+*/
+
+socket.on(
+    "playerColorChanged",
+    (data) => {
 
         const player =
             players[data.id];
 
 
-        /*
-        Player isn't loaded yet.
-        */
-
         if (!player) {
-
             return;
         }
 
 
-        /*
-        Update position.
-        */
-
-        player.x =
-            Number(data.x);
-
-        player.y =
-            Number(data.y);
+        player.color =
+            data.color;
 
 
-        updatePlayerPosition(
-            player
-        );
+        player.element.style.backgroundColor =
+            data.color;
     }
 );
 
@@ -825,7 +731,6 @@ socket.on(
 
 
         if (!player) {
-
             return;
         }
 
@@ -833,68 +738,14 @@ socket.on(
         player.element.remove();
 
 
-        delete players[
-            data.id
-        ];
+        delete players[data.id];
     }
 );
 
 
 /*
 ============================================================
-SEND MESSAGE
-============================================================
-*/
-
-startButton.addEventListener(
-    "click",
-    sendMessage
-);
-
-
-messageInput.addEventListener(
-    "keydown",
-    (event) => {
-
-        if (event.key === "Enter") {
-
-            event.preventDefault();
-
-            sendMessage();
-        }
-    }
-);
-
-
-function sendMessage() {
-
-    const text =
-        messageInput.value.trim();
-
-
-    if (!text) {
-
-        return;
-    }
-
-
-    socket.emit(
-        "message",
-        text
-    );
-
-
-    messageInput.value =
-        "";
-
-
-    messageInput.focus();
-}
-
-
-/*
-============================================================
-RECEIVE MESSAGE
+CHAT MESSAGE
 ============================================================
 */
 
@@ -907,7 +758,6 @@ socket.on(
 
 
         if (!player) {
-
             return;
         }
 
@@ -922,11 +772,36 @@ socket.on(
 
 /*
 ============================================================
+SYSTEM MESSAGE
+============================================================
+*/
+
+socket.on(
+    "systemMessage",
+    (data) => {
+
+        console.log(
+            "System:",
+            data.text
+        );
+    }
+);
+
+
+/*
+============================================================
 SPEECH BUBBLE
 ============================================================
 */
 
-function showSpeechBubble(player, text) {
+function showSpeechBubble(
+    player,
+    text
+) {
+
+    /*
+    Remove previous bubble.
+    */
 
     const oldBubble =
         player.element.querySelector(
@@ -939,8 +814,14 @@ function showSpeechBubble(player, text) {
     }
 
 
+    /*
+    Create bubble.
+    */
+
     const bubble =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
 
     bubble.className =
@@ -962,7 +843,36 @@ function showSpeechBubble(player, text) {
     ========================================================
     */
 
-    if (ttsMode === "browser") {
+    if (
+        ttsMode ===
+        "browser"
+    ) {
+
+        if (
+            !window.speechSynthesis
+        ) {
+
+            console.error(
+                "Browser TTS is unavailable."
+            );
+
+            setTimeout(
+                () => {
+
+                    if (
+                        bubble.parentNode
+                    ) {
+
+                        bubble.remove();
+                    }
+
+                },
+                5000
+            );
+
+            return;
+        }
+
 
         const utterance =
             new SpeechSynthesisUtterance(
@@ -970,34 +880,48 @@ function showSpeechBubble(player, text) {
             );
 
 
-        utterance.rate = 1;
-        utterance.pitch = 1;
-        utterance.volume = 1;
+        utterance.rate =
+            1;
+
+        utterance.pitch =
+            1;
+
+        utterance.volume =
+            1;
 
 
-        utterance.onend = () => {
+        utterance.onend =
+            () => {
 
-            if (bubble.parentNode) {
-                bubble.remove();
-            }
-        };
+                if (
+                    bubble.parentNode
+                ) {
 
-
-        utterance.onerror = (event) => {
-
-            console.error(
-                "Browser TTS error:",
-                event.error
-            );
+                    bubble.remove();
+                }
+            };
 
 
-            if (bubble.parentNode) {
-                bubble.remove();
-            }
-        };
+        utterance.onerror =
+            (error) => {
+
+                console.error(
+                    "Browser TTS error:",
+                    error
+                );
+
+
+                if (
+                    bubble.parentNode
+                ) {
+
+                    bubble.remove();
+                }
+            };
 
 
         window.speechSynthesis.cancel();
+
 
         window.speechSynthesis.speak(
             utterance
@@ -1010,11 +934,14 @@ function showSpeechBubble(player, text) {
 
     /*
     ========================================================
-    ESPEAK / SPEAK.JS
+    ESPEAK
     ========================================================
     */
 
-    if (ttsMode === "espeak") {
+    if (
+        ttsMode ===
+        "espeak"
+    ) {
 
         if (
             typeof speak !==
@@ -1025,46 +952,14 @@ function showSpeechBubble(player, text) {
                 "speak.js is not loaded."
             );
 
-            return;
-        }
 
+            /*
+            Keep the bubble briefly
+            if eSpeak is unavailable.
+            */
 
-        speak(
-            text,
-            {
-                amplitude: 100,
-                pitch: 50,
-                speed: 175,
-                voice: "en/en-us"
-            }
-        );
-
-
-        /*
-        speak.js creates an audio element
-        inside #audio.
-        */
-
-        const waitForAudio =
-            setInterval(() => {
-
-                const audio =
-                    document.querySelector(
-                        "#audio audio"
-                    );
-
-
-                if (!audio) {
-                    return;
-                }
-
-
-                clearInterval(
-                    waitForAudio
-                );
-
-
-                audio.onended = () => {
+            setTimeout(
+                () => {
 
                     if (
                         bubble.parentNode
@@ -1072,12 +967,229 @@ function showSpeechBubble(player, text) {
 
                         bubble.remove();
                     }
-                };
+
+                },
+                5000
+            );
 
 
-            }, 50);
+            return;
+        }
+
+
+        /*
+        Clear old eSpeak audio.
+        */
+
+        const audioContainer =
+            document.getElementById(
+                "audio"
+            );
+
+
+        if (audioContainer) {
+
+            audioContainer.innerHTML =
+                "";
+        }
+
+
+        /*
+        Start eSpeak.
+        */
+
+        speak(
+            text,
+            {
+                amplitude:
+                    100,
+
+                pitch:
+                    50,
+
+                speed:
+                    175,
+
+                voice:
+                    "en/en-us"
+            }
+        );
+
+
+        /*
+        Wait for speak.js to
+        create its audio element.
+        */
+
+        let attempts = 0;
+
+
+        const waitForAudio =
+            setInterval(
+                () => {
+
+                    attempts++;
+
+
+                    const audio =
+                        document.querySelector(
+                            "#audio audio"
+                        );
+
+
+                    if (audio) {
+
+                        clearInterval(
+                            waitForAudio
+                        );
+
+
+                        audio.addEventListener(
+                            "ended",
+                            () => {
+
+                                if (
+                                    bubble.parentNode
+                                ) {
+
+                                    bubble.remove();
+                                }
+                            },
+                            {
+                                once:
+                                    true
+                            }
+                        );
+
+
+                        audio.addEventListener(
+                            "error",
+                            () => {
+
+                                if (
+                                    bubble.parentNode
+                                ) {
+
+                                    bubble.remove();
+                                }
+                            },
+                            {
+                                once:
+                                    true
+                            }
+                        );
+
+
+                        return;
+                    }
+
+
+                    /*
+                    Stop looking after 10 seconds.
+                    */
+
+                    if (
+                        attempts >= 200
+                    ) {
+
+                        clearInterval(
+                            waitForAudio
+                        );
+
+
+                        if (
+                            bubble.parentNode
+                        ) {
+
+                            bubble.remove();
+                        }
+                    }
+
+                },
+                50
+            );
 
 
         return;
     }
 }
+
+
+/*
+============================================================
+SEND MESSAGE
+============================================================
+*/
+
+function sendMessage() {
+
+    const text =
+        messageInput.value.trim();
+
+
+    if (!text) {
+        return;
+    }
+
+
+    socket.emit(
+        "message",
+        text
+    );
+
+
+    messageInput.value =
+        "";
+
+
+    messageInput.focus();
+}
+
+
+/*
+============================================================
+START BUTTON = SEND
+============================================================
+*/
+
+startButton.addEventListener(
+    "click",
+    sendMessage
+);
+
+
+messageInput.addEventListener(
+    "keydown",
+    (event) => {
+
+        /*
+        Enter also sends.
+        */
+
+        if (
+            event.key ===
+            "Enter"
+        ) {
+
+            event.preventDefault();
+
+            sendMessage();
+        }
+    }
+);
+
+
+/*
+============================================================
+FOCUS MESSAGE INPUT
+============================================================
+*/
+
+messageInput.addEventListener(
+    "focus",
+    () => {
+
+        messageInput.select();
+    }
+);
+
