@@ -68,7 +68,34 @@
 
     <div id="desktop">
 
+        <div id="settingsButton">⚙ Settings</div>
 
+        <div id="settingsPanel">
+            <div class="settingsTitle">Settings</div>
+
+            <label>
+                <input
+                    type="radio"
+                    name="ttsMode"
+                    value="browser"
+                    checked
+                >
+                Browser TTS
+            </label>
+
+            <label>
+                <input
+                    type="radio"
+                    name="ttsMode"
+                    value="espeak"
+                >
+                eSpeak
+            </label>
+
+            <button id="closeSettings">
+                Close
+            </button>
+        </div>
         <!-- WORLD -->
 
         <div id="world"></div>
