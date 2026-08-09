@@ -31,6 +31,24 @@ const messageInput =
 const startButton =
     document.getElementById("startButton");
 
+const settingsButton =
+    document.getElementById("settingsButton");
+
+const settingsPanel =
+    document.getElementById("settingsPanel");
+
+const closeSettings =
+    document.getElementById("closeSettings");
+
+const ttsOptions =
+    document.querySelectorAll(
+        'input[name="ttsMode"]'
+    );
+
+
+let ttsMode =
+    localStorage.getItem("ttsMode") ||
+    "browser";
 
 /*
 ============================================================
