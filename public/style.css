@@ -283,18 +283,7 @@ OTHER PLAYERS
 ============================================================
 */
 
-/*.player:not(.myPlayer) {
-    cursor: grab;
 
-    /*
-    This is important:
-    other players cannot receive
-    pointer events, so they cannot
-    accidentally be dragged.
-    */
-
-    pointer-events: auto;
-}*/
 
 
 /*
