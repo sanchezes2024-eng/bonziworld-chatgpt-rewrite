@@ -86,7 +86,7 @@ if (roomInput) {
 
 /*
 ============================================================
-SETTINGS BUTTON
+SETTINGS
 ============================================================
 */
 
@@ -131,8 +131,7 @@ ttsOptions.forEach(
     (option) => {
 
         option.checked =
-            option.value ===
-            ttsMode;
+            option.value === ttsMode;
 
 
         option.addEventListener(
@@ -172,14 +171,14 @@ COLOR → HUE
 ============================================================
 */
 
-/*
-Bonzi.png is assumed to be purple,
-approximately hue 270 degrees.
-*/
-
 function colorToHue(color) {
 
-    const namedColors = {
+    if (!color) {
+        return 270;
+    }
+
+
+    const colors = {
 
         red: 0,
         orange: 30,
@@ -189,118 +188,104 @@ function colorToHue(color) {
         blue: 240,
         purple: 270,
         magenta: 300,
-        pink: 330,
-        lime: 90,
-        aqua: 180,
-        teal: 180,
-        navy: 240,
-        white: 0,
-        black: 0,
-        gray: 0,
-        grey: 0,
-        silver: 0
+        pink: 330
 
     };
 
 
     color =
-        String(color)
-            .toLowerCase();
+        color.toLowerCase();
 
-
-    /*
-    Named color.
-    */
 
     if (
-        namedColors[color] !==
-        undefined
+        colors[color] !== undefined
     ) {
 
-        return namedColors[color];
+        return colors[color];
     }
 
 
     /*
-    Hex color.
+    Handle some of the hex colors
+    used by /color.
     */
 
     if (
-        /^#[0-9a-f]{6}$/i.test(color)
+        color === "#ff0000"
     ) {
+        return 0;
+    }
 
-        const r =
-            parseInt(
-                color.substring(1, 3),
-                16
-            ) / 255;
+    if (
+        color === "#00ff00"
+    ) {
+        return 120;
+    }
 
-        const g =
-            parseInt(
-                color.substring(3, 5),
-                16
-            ) / 255;
+    if (
+        color === "#0000ff"
+    ) {
+        return 240;
+    }
 
-        const b =
-            parseInt(
-                color.substring(5, 7),
-                16
-            ) / 255;
+    if (
+        color === "#ffff00"
+    ) {
+        return 60;
+    }
 
+    if (
+        color === "#ff00ff"
+    ) {
+        return 300;
+    }
 
-        const max =
-            Math.max(r, g, b);
+    if (
+        color === "#00ffff"
+    ) {
+        return 180;
+    }
 
-        const min =
-            Math.min(r, g, b);
+    if (
+        color === "#ff8800"
+    ) {
+        return 30;
+    }
 
-        const difference =
-            max - min;
+    if (
+        color === "#8800ff"
+    ) {
+        return 270;
+    }
 
+    if (
+        color === "#00aa88"
+    ) {
+        return 168;
+    }
 
-        if (difference === 0) {
-            return 270;
-        }
+    if (
+        color === "#ff66aa"
+    ) {
+        return 330;
+    }
 
+    if (
+        color === "#6666ff"
+    ) {
+        return 240;
+    }
 
-        let hue;
+    if (
+        color === "#66cc66"
+    ) {
+        return 120;
+    }
 
-
-        if (max === r) {
-
-            hue =
-                60 *
-                (
-                    ((g - b) / difference) %
-                    6
-                );
-
-        } else if (max === g) {
-
-            hue =
-                60 *
-                (
-                    ((b - r) / difference) +
-                    2
-                );
-
-        } else {
-
-            hue =
-                60 *
-                (
-                    ((r - g) / difference) +
-                    4
-                );
-        }
-
-
-        if (hue < 0) {
-            hue += 360;
-        }
-
-
-        return hue;
+    if (
+        color === "#ffffff"
+    ) {
+        return 270;
     }
 
 
@@ -329,19 +314,11 @@ function updatePlayerColor(
         );
 
 
-    /*
-    Bonzi uses hue rotation.
-    */
-
     if (bonzi) {
 
         const hue =
             colorToHue(color);
 
-
-        /*
-        Original Bonzi is purple (~270).
-        */
 
         bonzi.style.setProperty(
             "--bonzi-hue",
@@ -350,63 +327,13 @@ function updatePlayerColor(
     }
 
 
-    /*
-    Square uses normal background color.
-    */
-
     if (
-        player.character ===
-        "square"
+        player.character === "square"
     ) {
 
         player.element.style.backgroundColor =
             color;
     }
-}
-
-
-/*
-============================================================
-CREATE BONZI IMAGE
-============================================================
-*/
-
-function createBonziImage(
-    player,
-    color
-) {
-
-    const image =
-        document.createElement("img");
-
-
-    image.src =
-        "/bonzi.png";
-
-
-    image.className =
-        "bonziCharacter";
-
-
-    image.draggable =
-        false;
-
-
-    image.alt =
-        "";
-
-
-    const hue =
-        colorToHue(color);
-
-
-    image.style.setProperty(
-        "--bonzi-hue",
-        `${hue - 270}deg`
-    );
-
-
-    return image;
 }
 
 
@@ -443,19 +370,35 @@ function createPlayer(data) {
 
 
     /*
-    IMPORTANT:
-    Add myPlayer to YOUR player.
-    This fixes the hand cursor and dragging.
+    Player name.
     */
 
-    if (
-        data.id === myId
-    ) {
+    const nameLabel =
+        document.createElement("div");
 
-        element.classList.add(
-            "myPlayer"
-        );
-    }
+
+    nameLabel.className =
+        "playerName";
+
+
+    nameLabel.textContent =
+        data.name;
+
+
+    element.appendChild(
+        nameLabel
+    );
+
+
+    /*
+    Position.
+    */
+
+    element.style.left =
+        `${data.x}%`;
+
+    element.style.top =
+        `${data.y}%`;
 
 
     /*
@@ -471,10 +414,10 @@ function createPlayer(data) {
             data.name,
 
         x:
-            Number(data.x),
+            data.x,
 
         y:
-            Number(data.y),
+            data.y,
 
         color:
             data.color ||
@@ -490,51 +433,32 @@ function createPlayer(data) {
 
 
     /*
-    Position.
-    */
-
-    element.style.left =
-        `${player.x}%`;
-
-    element.style.top =
-        `${player.y}%`;
-
-
-    /*
-    Player name.
-    */
-
-    const nameLabel =
-        document.createElement("div");
-
-
-    nameLabel.className =
-        "playerName";
-
-
-    nameLabel.textContent =
-        player.name;
-
-
-    element.appendChild(
-        nameLabel
-    );
-
-
-    /*
-    Character.
+    Create the correct character.
     */
 
     if (
-        player.character ===
-        "bonzi"
+        player.character === "bonzi"
     ) {
 
+        element.classList.add(
+            "bonziPlayer"
+        );
+
+
         const image =
-            createBonziImage(
-                player,
-                player.color
-            );
+            document.createElement("img");
+
+
+        image.src =
+            "/bonzi.png";
+
+
+        image.className =
+            "bonziCharacter";
+
+
+        image.draggable =
+            false;
 
 
         element.appendChild(
@@ -558,17 +482,32 @@ function createPlayer(data) {
     );
 
 
-    players[player.id] =
+    players[data.id] =
         player;
 
 
     /*
-    Only YOUR player gets dragging.
+    Apply Bonzi color.
+    */
+
+    updatePlayerColor(
+        player,
+        player.color
+    );
+
+
+    /*
+    Only YOUR player can be dragged.
     */
 
     if (
-        player.id === myId
+        data.id === myId
     ) {
+
+        element.classList.add(
+            "myPlayer"
+        );
+
 
         setupDragging(
             player
@@ -582,7 +521,7 @@ function createPlayer(data) {
 
 /*
 ============================================================
-UPDATE PLAYER CHARACTER
+CHANGE PLAYER CHARACTER
 ============================================================
 */
 
@@ -591,17 +530,12 @@ function updatePlayerCharacter(
     character
 ) {
 
-    if (!player) {
-        return;
-    }
-
-
     player.character =
         character;
 
 
     /*
-    Remove existing Bonzi image.
+    Remove old Bonzi image.
     */
 
     const oldBonzi =
@@ -616,32 +550,52 @@ function updatePlayerCharacter(
 
 
     /*
-    Remove square styling.
+    Remove old character classes.
     */
 
     player.element.classList.remove(
+        "bonziPlayer",
         "squareCharacter"
     );
 
 
     /*
+    Clear old square background.
+    */
+
+    player.element.style.backgroundColor =
+        "";
+
+
+    /*
+    ========================================================
     BONZI
+    ========================================================
     */
 
     if (
-        character ===
-        "bonzi"
+        character === "bonzi"
     ) {
 
-        player.element.style.backgroundColor =
-            "transparent";
+        player.element.classList.add(
+            "bonziPlayer"
+        );
 
 
         const image =
-            createBonziImage(
-                player,
-                player.color
-            );
+            document.createElement("img");
+
+
+        image.src =
+            "/bonzi.png";
+
+
+        image.className =
+            "bonziCharacter";
+
+
+        image.draggable =
+            false;
 
 
         player.element.appendChild(
@@ -650,12 +604,13 @@ function updatePlayerCharacter(
 
 
         /*
-        Make sure Bonzi doesn't interfere
-        with dragging.
+        Reapply color hue.
         */
 
-        image.draggable =
-            false;
+        updatePlayerColor(
+            player,
+            player.color
+        );
 
 
         return;
@@ -663,12 +618,13 @@ function updatePlayerCharacter(
 
 
     /*
+    ========================================================
     SQUARE
+    ========================================================
     */
 
     if (
-        character ===
-        "square"
+        character === "square"
     ) {
 
         player.element.classList.add(
@@ -694,10 +650,6 @@ function setupDragging(player) {
         false;
 
 
-    /*
-    Make the cursor a hand.
-    */
-
     player.element.style.cursor =
         "grab";
 
@@ -714,15 +666,9 @@ function setupDragging(player) {
         "pointerdown",
         (event) => {
 
-            /*
-            Absolutely prevent dragging
-            another player.
-            */
-
             if (
                 player.id !== myId
             ) {
-
                 return;
             }
 
@@ -791,14 +737,20 @@ function setupDragging(player) {
             x =
                 Math.max(
                     2,
-                    Math.min(98, x)
+                    Math.min(
+                        98,
+                        x
+                    )
                 );
 
 
             y =
                 Math.max(
                     2,
-                    Math.min(95, y)
+                    Math.min(
+                        95,
+                        y
+                    )
                 );
 
 
@@ -879,7 +831,6 @@ function setupDragging(player) {
             dragging =
                 false;
 
-
             player.element.style.cursor =
                 "grab";
         }
@@ -945,8 +896,7 @@ nameInput.addEventListener(
     (event) => {
 
         if (
-            event.key ===
-            "Enter"
+            event.key === "Enter"
         ) {
 
             joinRoom();
@@ -960,8 +910,7 @@ roomInput.addEventListener(
     (event) => {
 
         if (
-            event.key ===
-            "Enter"
+            event.key === "Enter"
         ) {
 
             joinRoom();
@@ -1200,9 +1149,7 @@ function showSpeechBubble(
 
 
     const bubble =
-        document.createElement(
-            "div"
-        );
+        document.createElement("div");
 
 
     bubble.className =
@@ -1225,8 +1172,7 @@ function showSpeechBubble(
     */
 
     if (
-        ttsMode ===
-        "browser"
+        ttsMode === "browser"
     ) {
 
         if (
@@ -1239,7 +1185,6 @@ function showSpeechBubble(
                     if (
                         bubble.parentNode
                     ) {
-
                         bubble.remove();
                     }
 
@@ -1310,13 +1255,11 @@ function showSpeechBubble(
     */
 
     if (
-        ttsMode ===
-        "espeak"
+        ttsMode === "espeak"
     ) {
 
         if (
-            typeof speak !==
-            "function"
+            typeof speak !== "function"
         ) {
 
             setTimeout(
@@ -1325,7 +1268,6 @@ function showSpeechBubble(
                     if (
                         bubble.parentNode
                     ) {
-
                         bubble.remove();
                     }
 
@@ -1353,17 +1295,10 @@ function showSpeechBubble(
         speak(
             text,
             {
-                amplitude:
-                    100,
-
-                pitch:
-                    50,
-
-                speed:
-                    175,
-
-                voice:
-                    "en/en-us"
+                amplitude: 100,
+                pitch: 50,
+                speed: 175,
+                voice: "en/en-us"
             }
         );
 
@@ -1402,10 +1337,10 @@ function showSpeechBubble(
 
                                     bubble.remove();
                                 }
+
                             },
                             {
-                                once:
-                                    true
+                                once: true
                             }
                         );
 
@@ -1420,10 +1355,10 @@ function showSpeechBubble(
 
                                     bubble.remove();
                                 }
+
                             },
                             {
-                                once:
-                                    true
+                                once: true
                             }
                         );
 
@@ -1433,8 +1368,7 @@ function showSpeechBubble(
 
 
                     if (
-                        attempts >=
-                        200
+                        attempts >= 200
                     ) {
 
                         clearInterval(
@@ -1488,12 +1422,6 @@ function sendMessage() {
 }
 
 
-/*
-============================================================
-START BUTTON = SEND
-============================================================
-*/
-
 startButton.addEventListener(
     "click",
     sendMessage
@@ -1505,8 +1433,7 @@ messageInput.addEventListener(
     (event) => {
 
         if (
-            event.key ===
-            "Enter"
+            event.key === "Enter"
         ) {
 
             event.preventDefault();
@@ -1516,12 +1443,6 @@ messageInput.addEventListener(
     }
 );
 
-
-/*
-============================================================
-FOCUS MESSAGE INPUT
-============================================================
-*/
 
 messageInput.addEventListener(
     "focus",
