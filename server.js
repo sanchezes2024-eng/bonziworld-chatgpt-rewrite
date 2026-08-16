@@ -3,7 +3,8 @@ const fs = require("fs");
 const path = require("path");
 const { Server } = require("socket.io");
 
-const PORT = process.env.PORT || 3000;
+const PORT =
+    process.env.PORT || 3000;
 
 
 /*
@@ -30,8 +31,11 @@ function randomColor() {
         "#ffffff"
     ];
 
+
     return colors[
-        Math.floor(Math.random() * colors.length)
+        Math.floor(
+            Math.random() * colors.length
+        )
     ];
 }
 
@@ -42,178 +46,199 @@ HTTP SERVER
 ============================================================
 */
 
-const server = http.createServer((req, res) => {
+const server =
+    http.createServer(
+        (req, res) => {
 
-    let filePath;
+            let filePath;
 
-    const url =
-        req.url.split("?")[0];
-
-
-    if (
-        url === "/" ||
-        url === "/index.html"
-    ) {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "index.html"
-            );
-
-    } else if (url === "/readme.html") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "readme.html"
-            );
-
-    } else if (url === "/readme.css") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "readme.css"
-            );
-
-    } else if (url === "/style.css") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "style.css"
-            );
-
-    } else if (url === "/script.js") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "script.js"
-            );
-
-    } else if (url === "/background.png") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "background.png"
-            );
-
-    } else if (url === "/bonzi.png") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "bonzi.png"
-            );
-
-    } else if (url === "/speakClient.js") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "speakClient.js"
-            );
-
-    } else if (url === "/speakWorker.js") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "speakWorker.js"
-            );
-
-    } else if (url === "/speakGenerator.js") {
-
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "speakGenerator.js"
-            );
-
-    } else {
-
-        res.writeHead(404);
-        res.end("Not Found");
-
-        return;
-    }
+            const url =
+                req.url.split("?")[0];
 
 
-    const extension =
-        path.extname(filePath);
+            if (
+                url === "/" ||
+                url === "/index.html"
+            ) {
 
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "index.html"
+                    );
 
-    const contentTypes = {
+            } else if (
+                url === "/readme.html"
+            ) {
 
-        ".html":
-            "text/html; charset=utf-8",
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "readme.html"
+                    );
 
-        ".css":
-            "text/css; charset=utf-8",
+            } else if (
+                url === "/readme.css"
+            ) {
 
-        ".js":
-            "application/javascript; charset=utf-8",
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "readme.css"
+                    );
 
-        ".png":
-            "image/png",
+            } else if (
+                url === "/style.css"
+            ) {
 
-        ".wav":
-            "audio/wav"
-    };
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "style.css"
+                    );
 
+            } else if (
+                url === "/script.js"
+            ) {
 
-    const contentType =
-        contentTypes[extension] ||
-        "application/octet-stream";
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "script.js"
+                    );
 
+            } else if (
+                url === "/background.png"
+            ) {
 
-    fs.readFile(
-        filePath,
-        (error, data) => {
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "background.png"
+                    );
 
-            if (error) {
+            } else if (
+                url === "/bonzi.png"
+            ) {
 
-                console.error(
-                    "File error:",
-                    error
-                );
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "bonzi.png"
+                    );
 
-                res.writeHead(500);
+            } else if (
+                url === "/speakClient.js"
+            ) {
 
-                res.end(
-                    "Server Error"
-                );
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "speakClient.js"
+                    );
+
+            } else if (
+                url === "/speakWorker.js"
+            ) {
+
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "speakWorker.js"
+                    );
+
+            } else if (
+                url === "/speakGenerator.js"
+            ) {
+
+                filePath =
+                    path.join(
+                        __dirname,
+                        "public",
+                        "speakGenerator.js"
+                    );
+
+            } else {
+
+                res.writeHead(404);
+                res.end("Not Found");
 
                 return;
             }
 
 
-            res.writeHead(
-                200,
-                {
-                    "Content-Type":
-                        contentType
+            const extension =
+                path.extname(filePath);
+
+
+            const contentTypes = {
+
+                ".html":
+                    "text/html; charset=utf-8",
+
+                ".css":
+                    "text/css; charset=utf-8",
+
+                ".js":
+                    "application/javascript; charset=utf-8",
+
+                ".png":
+                    "image/png",
+
+                ".wav":
+                    "audio/wav"
+            };
+
+
+            const contentType =
+                contentTypes[extension] ||
+                "application/octet-stream";
+
+
+            fs.readFile(
+                filePath,
+                (error, data) => {
+
+                    if (error) {
+
+                        console.error(
+                            "File error:",
+                            error
+                        );
+
+                        res.writeHead(500);
+
+                        res.end(
+                            "Server Error"
+                        );
+
+                        return;
+                    }
+
+
+                    res.writeHead(
+                        200,
+                        {
+                            "Content-Type":
+                                contentType
+                        }
+                    );
+
+
+                    res.end(data);
                 }
             );
-
-
-            res.end(data);
         }
     );
-});
 
 
 /*
@@ -282,7 +307,7 @@ io.on(
 
 
                 /*
-                Random starting position.
+                Random position.
                 */
 
                 socket.data.x =
@@ -293,7 +318,7 @@ io.on(
 
 
                 /*
-                Random starting color.
+                Random color.
                 */
 
                 socket.data.color =
@@ -301,7 +326,7 @@ io.on(
 
 
                 /*
-                Everyone starts as Bonzi.
+                Default character.
                 */
 
                 socket.data.character =
@@ -312,9 +337,7 @@ io.on(
 
 
                 /*
-                =================================================
-                TELL NEW PLAYER ABOUT THEMSELVES
-                =================================================
+                Send player their own data.
                 */
 
                 socket.emit(
@@ -345,9 +368,7 @@ io.on(
 
 
                 /*
-                =================================================
-                TELL EVERYONE ELSE ABOUT NEW PLAYER
-                =================================================
+                Tell existing players.
                 */
 
                 socket.to(room).emit(
@@ -375,9 +396,8 @@ io.on(
 
 
                 /*
-                =================================================
-                SEND EXISTING PLAYERS TO NEW PLAYER
-                =================================================
+                Send existing players
+                to the new player.
                 */
 
                 const roomSockets =
@@ -473,6 +493,7 @@ io.on(
                     !Number.isFinite(x) ||
                     !Number.isFinite(y)
                 ) {
+
                     return;
                 }
 
@@ -542,6 +563,7 @@ io.on(
                     !room ||
                     !name
                 ) {
+
                     return;
                 }
 
@@ -608,6 +630,7 @@ io.on(
 
 
                         const allowedColors = [
+
                             "red",
                             "green",
                             "blue",
@@ -626,6 +649,7 @@ io.on(
                             "navy",
                             "teal",
                             "silver"
+
                         ];
 
 
@@ -695,10 +719,6 @@ io.on(
                         parts[1]?.toLowerCase();
 
 
-                    /*
-                    /char toggles.
-                    */
-
                     if (!character) {
 
                         character =
@@ -728,10 +748,6 @@ io.on(
                     socket.data.character =
                         character;
 
-
-                    /*
-                    Tell everyone.
-                    */
 
                     io.to(room).emit(
                         "playerCharacterChanged",
