@@ -512,11 +512,11 @@ function createPlayer(data) {
         setupDragging(
             player
         );
-    }
+    
 
 
-    return player;
-}
+        return player;
+
 
 
 /*
@@ -666,11 +666,7 @@ function setupDragging(player) {
         "pointerdown",
         (event) => {
 
-            if (
-                player.id !== myId
-            ) {
-                return;
-            }
+            
 
 
             dragging =
