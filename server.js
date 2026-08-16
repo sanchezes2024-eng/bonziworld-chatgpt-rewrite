@@ -293,11 +293,11 @@ io.on(
 
 
                 /*
-                Default player color.
+                Player color is random.
                 */
 
                 socket.data.color =
-                    "#8000ff";
+                    randomColor();
 
 
                 /*
