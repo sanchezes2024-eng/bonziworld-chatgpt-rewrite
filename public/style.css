@@ -163,6 +163,35 @@ PLAYERS
 ============================================================
 */
 
+.bonziCharacter {
+    width: 100%;
+    height: 100%;
+
+    object-fit: contain;
+
+    pointer-events: none;
+
+    user-select: none;
+
+    -webkit-user-select: none;
+
+    /*
+    The JavaScript changes this
+    custom property for each player.
+    */
+
+    filter: hue-rotate(
+        var(--bonzi-hue, 0deg)
+    );
+}
+
+.squareCharacter {
+    width: 100%;
+    height: 100%;
+
+    background: purple;
+}
+
 .player {
     position: absolute;
 
@@ -270,6 +299,7 @@ PLAYER NAME
 
     -webkit-user-select: none;
 }
+
 
 
 /*
