@@ -31,13 +31,6 @@ const messageInput =
 const startButton =
     document.getElementById("startButton");
 
-
-/*
-============================================================
-SETTINGS
-============================================================
-*/
-
 const settingsButton =
     document.getElementById("settingsButton");
 
@@ -53,78 +46,15 @@ const ttsOptions =
     );
 
 
+/*
+============================================================
+TTS
+============================================================
+*/
+
 let ttsMode =
     localStorage.getItem("ttsMode") ||
     "browser";
-
-
-/*
-============================================================
-PLAYER DATA
-============================================================
-*/
-
-const players = {};
-
-let myId = null;
-
-let myName = "";
-
-let currentRoom = "default";
-
-
-/*
-============================================================
-DEFAULT ROOM
-============================================================
-*/
-
-if (roomInput) {
-    roomInput.value = "default";
-}
-
-
-/*
-============================================================
-SETTINGS
-============================================================
-*/
-
-if (settingsButton) {
-
-    settingsButton.addEventListener(
-        "click",
-        () => {
-
-            if (
-                settingsPanel.style.display ===
-                "block"
-            ) {
-
-                settingsPanel.style.display =
-                    "none";
-
-            } else {
-
-                settingsPanel.style.display =
-                    "block";
-            }
-        }
-    );
-}
-
-
-if (closeSettings) {
-
-    closeSettings.addEventListener(
-        "click",
-        () => {
-
-            settingsPanel.style.display =
-                "none";
-        }
-    );
-}
 
 
 ttsOptions.forEach(
@@ -167,6 +97,68 @@ ttsOptions.forEach(
 
 /*
 ============================================================
+PLAYER DATA
+============================================================
+*/
+
+const players = {};
+
+let myId = null;
+
+let myName = "";
+
+let currentRoom = "default";
+
+
+/*
+============================================================
+DEFAULT ROOM
+============================================================
+*/
+
+if (roomInput) {
+
+    roomInput.value =
+        "default";
+}
+
+
+/*
+============================================================
+SETTINGS
+============================================================
+*/
+
+if (settingsButton) {
+
+    settingsButton.addEventListener(
+        "click",
+        () => {
+
+            settingsPanel.style.display =
+                settingsPanel.style.display === "block"
+                    ? "none"
+                    : "block";
+        }
+    );
+}
+
+
+if (closeSettings) {
+
+    closeSettings.addEventListener(
+        "click",
+        () => {
+
+            settingsPanel.style.display =
+                "none";
+        }
+    );
+}
+
+
+/*
+============================================================
 COLOR → HUE
 ============================================================
 */
@@ -188,7 +180,17 @@ function colorToHue(color) {
         blue: 240,
         purple: 270,
         magenta: 300,
-        pink: 330
+        pink: 330,
+
+        black: 270,
+        gray: 270,
+        grey: 270,
+        lime: 90,
+        aqua: 180,
+        navy: 240,
+        teal: 180,
+        silver: 270,
+        white: 270
 
     };
 
@@ -206,86 +208,81 @@ function colorToHue(color) {
 
 
     /*
-    Handle some of the hex colors
-    used by /color.
+    Handle hex colors.
     */
 
     if (
-        color === "#ff0000"
+        /^#[0-9a-f]{6}$/i.test(color)
     ) {
-        return 0;
-    }
 
-    if (
-        color === "#00ff00"
-    ) {
-        return 120;
-    }
+        const r =
+            parseInt(
+                color.substring(1, 3),
+                16
+            );
 
-    if (
-        color === "#0000ff"
-    ) {
-        return 240;
-    }
+        const g =
+            parseInt(
+                color.substring(3, 5),
+                16
+            );
 
-    if (
-        color === "#ffff00"
-    ) {
-        return 60;
-    }
+        const b =
+            parseInt(
+                color.substring(5, 7),
+                16
+            );
 
-    if (
-        color === "#ff00ff"
-    ) {
-        return 300;
-    }
 
-    if (
-        color === "#00ffff"
-    ) {
-        return 180;
-    }
+        const max =
+            Math.max(r, g, b);
 
-    if (
-        color === "#ff8800"
-    ) {
-        return 30;
-    }
+        const min =
+            Math.min(r, g, b);
 
-    if (
-        color === "#8800ff"
-    ) {
-        return 270;
-    }
 
-    if (
-        color === "#00aa88"
-    ) {
-        return 168;
-    }
+        if (max === min) {
+            return 270;
+        }
 
-    if (
-        color === "#ff66aa"
-    ) {
-        return 330;
-    }
 
-    if (
-        color === "#6666ff"
-    ) {
-        return 240;
-    }
+        let hue;
 
-    if (
-        color === "#66cc66"
-    ) {
-        return 120;
-    }
 
-    if (
-        color === "#ffffff"
-    ) {
-        return 270;
+        if (max === r) {
+
+            hue =
+                60 * (
+                    (g - b) /
+                    (max - min)
+                );
+
+        } else if (max === g) {
+
+            hue =
+                60 * (
+                    2 +
+                    (b - r) /
+                    (max - min)
+                );
+
+        } else {
+
+            hue =
+                60 * (
+                    4 +
+                    (r - g) /
+                    (max - min)
+                );
+        }
+
+
+        if (hue < 0) {
+            hue += 360;
+        }
+
+
+        return hue;
     }
 
 
@@ -370,7 +367,7 @@ function createPlayer(data) {
 
 
     /*
-    Player name.
+    NAME
     */
 
     const nameLabel =
@@ -391,7 +388,7 @@ function createPlayer(data) {
 
 
     /*
-    Position.
+    POSITION
     */
 
     element.style.left =
@@ -402,7 +399,7 @@ function createPlayer(data) {
 
 
     /*
-    Player data.
+    PLAYER DATA
     */
 
     const player = {
@@ -433,7 +430,7 @@ function createPlayer(data) {
 
 
     /*
-    Create the correct character.
+    CHARACTER
     */
 
     if (
@@ -487,7 +484,7 @@ function createPlayer(data) {
 
 
     /*
-    Apply Bonzi color.
+    APPLY COLOR
     */
 
     updatePlayerColor(
@@ -497,27 +494,17 @@ function createPlayer(data) {
 
 
     /*
-    Only YOUR player can be dragged.
+    DRAGGING
     */
 
-    if (
-        data.id === myId
-    ) {
-
-        element.classList.add(
-            "myPlayer"
-        );
+    setupDragging(
+        player
+    );
 
 
-        setupDragging(
-            player
-        );
-    
+    return player;
+}
 
-
-        return player;
-
-    }
 
 /*
 ============================================================
@@ -550,7 +537,7 @@ function updatePlayerCharacter(
 
 
     /*
-    Remove old character classes.
+    Remove character classes.
     */
 
     player.element.classList.remove(
@@ -560,7 +547,7 @@ function updatePlayerCharacter(
 
 
     /*
-    Clear old square background.
+    Clear square background.
     */
 
     player.element.style.backgroundColor =
@@ -568,9 +555,7 @@ function updatePlayerCharacter(
 
 
     /*
-    ========================================================
     BONZI
-    ========================================================
     */
 
     if (
@@ -603,10 +588,6 @@ function updatePlayerCharacter(
         );
 
 
-        /*
-        Reapply color hue.
-        */
-
         updatePlayerColor(
             player,
             player.color
@@ -618,9 +599,7 @@ function updatePlayerCharacter(
 
 
     /*
-    ========================================================
     SQUARE
-    ========================================================
     */
 
     if (
@@ -650,24 +629,9 @@ function setupDragging(player) {
         false;
 
 
-    player.element.style.cursor =
-        "grab";
-
-
-    player.element.style.touchAction =
-        "none";
-
-
-    player.element.style.userSelect =
-        "none";
-
-
     player.element.addEventListener(
         "pointerdown",
         (event) => {
-
-            
-
 
             dragging =
                 true;
@@ -684,10 +648,7 @@ function setupDragging(player) {
                 );
 
             } catch (error) {
-
-                console.log(
-                    "Pointer capture unavailable."
-                );
+                // Ignore.
             }
 
 
@@ -803,7 +764,7 @@ function setupDragging(player) {
             );
 
         } catch (error) {
-            // Already released.
+            // Ignore.
         }
     }
 
@@ -1162,9 +1123,7 @@ function showSpeechBubble(
 
 
     /*
-    ========================================================
     BROWSER TTS
-    ========================================================
     */
 
     if (
@@ -1245,9 +1204,7 @@ function showSpeechBubble(
 
 
     /*
-    ========================================================
     ESPEAK
-    ========================================================
     */
 
     if (
