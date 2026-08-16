@@ -728,6 +728,8 @@ function setupDragging(player) {
             socket.emit(
                 "move",
                 {
+                    id: 
+                        player.id,
                     x:
                         x,
 
