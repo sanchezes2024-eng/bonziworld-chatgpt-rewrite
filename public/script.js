@@ -109,6 +109,7 @@ let myName = "";
 
 let currentRoom = "default";
 
+let currentlyDraggingPlayer = null;
 
 /*
 ============================================================
@@ -636,6 +637,8 @@ function setupDragging(player) {
             dragging =
                 true;
 
+            currentlyDraggingPlayer =
+                player;
 
             player.element.style.cursor =
                 "grabbing";
@@ -757,6 +760,15 @@ function setupDragging(player) {
 
         player.element.style.cursor =
             "grab";
+
+
+        if (
+            currentlyDraggingPlayer === player
+        ) {
+    
+            currentlyDraggingPlayer =
+                null;
+        }
 
 
         try {
@@ -939,6 +951,20 @@ socket.on(
 
 
         if (!player) {
+            return;
+        }
+
+
+        /*
+        Ignore the server echo for the character
+        we are currently dragging.
+
+        It already moved locally.
+        */
+
+        if (
+            player === currentlyDraggingPlayer
+        ) {
             return;
         }
 
