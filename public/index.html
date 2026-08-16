@@ -2,7 +2,6 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
 
     <meta
@@ -16,23 +15,17 @@
         rel="stylesheet"
         href="/style.css"
     >
-
 </head>
-
 
 <body>
 
-
-    <!-- ==================================================
-         LOGIN SCREEN
-    =================================================== -->
+    <!-- LOGIN -->
 
     <div id="loginScreen">
 
         <div class="loginBox">
 
             <h1>Chat</h1>
-
 
             <input
                 id="nameInput"
@@ -41,7 +34,6 @@
                 maxlength="30"
                 autocomplete="off"
             >
-
 
             <input
                 id="roomInput"
@@ -52,31 +44,36 @@
                 autocomplete="off"
             >
 
-
             <button id="submitButton">
                 Submit
             </button>
 
         </div>
+
         <a
             id="readmeLink"
             href="/readme.html"
         >
             README
         </a>
+
     </div>
 
 
-    <!-- ==================================================
-         DESKTOP
-    =================================================== -->
+    <!-- DESKTOP -->
 
     <div id="desktop">
 
-        <div id="settingsButton">⚙ Settings</div>
+        <div id="settingsButton">
+            ⚙ Settings
+        </div>
+
 
         <div id="settingsPanel">
-            <div class="settingsTitle">Settings</div>
+
+            <div class="settingsTitle">
+                Settings
+            </div>
 
             <label>
                 <input
@@ -100,23 +97,22 @@
             <button id="closeSettings">
                 Close
             </button>
+
         </div>
+
+
         <!-- WORLD -->
 
         <div id="world"></div>
 
 
-        <!-- ==================================================
-             TASKBAR
-        =================================================== -->
+        <!-- TASKBAR -->
 
         <div id="taskbar">
-
 
             <button id="startButton">
                 Start
             </button>
-
 
             <input
                 id="messageInput"
@@ -126,23 +122,21 @@
                 autocomplete="off"
             >
 
-
         </div>
-
 
     </div>
 
 
-    <!-- ==================================================
-         SOCKET.IO
-    =================================================== -->
+    <!-- AUDIO -->
 
     <div id="audio"></div>
-    
+
+
+    <!-- SCRIPTS -->
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="/speakClient.js"></script>
     <script src="/script.js"></script>
-
 
 </body>
 
