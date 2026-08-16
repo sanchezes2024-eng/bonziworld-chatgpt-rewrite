@@ -283,8 +283,8 @@ OTHER PLAYERS
 ============================================================
 */
 
-.player:not(.myPlayer) {
-    cursor: default;
+/*.player:not(.myPlayer) {
+    cursor: grab;
 
     /*
     This is important:
@@ -293,8 +293,8 @@ OTHER PLAYERS
     accidentally be dragged.
     */
 
-    pointer-events: none;
-}
+    pointer-events: auto;
+}*/
 
 
 /*
