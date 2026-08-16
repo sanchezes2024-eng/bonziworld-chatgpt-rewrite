@@ -1,4 +1,3 @@
-
 const socket = io();
 
 
@@ -9,66 +8,44 @@ ELEMENTS
 */
 
 const loginScreen =
-    document.getElementById(
-        "loginScreen"
-    );
+    document.getElementById("loginScreen");
 
 const desktop =
-    document.getElementById(
-        "desktop"
-    );
+    document.getElementById("desktop");
 
 const nameInput =
-    document.getElementById(
-        "nameInput"
-    );
+    document.getElementById("nameInput");
 
 const roomInput =
-    document.getElementById(
-        "roomInput"
-    );
+    document.getElementById("roomInput");
 
 const submitButton =
-    document.getElementById(
-        "submitButton"
-    );
+    document.getElementById("submitButton");
 
 const world =
-    document.getElementById(
-        "world"
-    );
+    document.getElementById("world");
 
 const messageInput =
-    document.getElementById(
-        "messageInput"
-    );
+    document.getElementById("messageInput");
 
 const startButton =
-    document.getElementById(
-        "startButton"
-    );
+    document.getElementById("startButton");
 
 
 /*
 ============================================================
-SETTINGS ELEMENTS
+SETTINGS
 ============================================================
 */
 
 const settingsButton =
-    document.getElementById(
-        "settingsButton"
-    );
+    document.getElementById("settingsButton");
 
 const settingsPanel =
-    document.getElementById(
-        "settingsPanel"
-    );
+    document.getElementById("settingsPanel");
 
 const closeSettings =
-    document.getElementById(
-        "closeSettings"
-    );
+    document.getElementById("closeSettings");
 
 const ttsOptions =
     document.querySelectorAll(
@@ -77,9 +54,8 @@ const ttsOptions =
 
 
 let ttsMode =
-    localStorage.getItem(
-        "ttsMode"
-    ) || "browser";
+    localStorage.getItem("ttsMode") ||
+    "browser";
 
 
 /*
@@ -104,15 +80,13 @@ DEFAULT ROOM
 */
 
 if (roomInput) {
-
-    roomInput.value =
-        "default";
+    roomInput.value = "default";
 }
 
 
 /*
 ============================================================
-SETTINGS
+SETTINGS BUTTON
 ============================================================
 */
 
@@ -153,10 +127,6 @@ if (closeSettings) {
 }
 
 
-/*
-Set saved TTS option.
-*/
-
 ttsOptions.forEach(
     (option) => {
 
@@ -169,9 +139,7 @@ ttsOptions.forEach(
             "change",
             () => {
 
-                if (
-                    !option.checked
-                ) {
+                if (!option.checked) {
                     return;
                 }
 
@@ -185,11 +153,6 @@ ttsOptions.forEach(
                     ttsMode
                 );
 
-
-                /*
-                Stop browser TTS
-                when switching away.
-                */
 
                 if (
                     window.speechSynthesis
@@ -205,13 +168,19 @@ ttsOptions.forEach(
 
 /*
 ============================================================
-CREATE PLAYER
+COLOR → HUE
 ============================================================
+*/
+
+/*
+Bonzi.png is assumed to be purple,
+approximately hue 270 degrees.
 */
 
 function colorToHue(color) {
 
-    const colors = {
+    const namedColors = {
+
         red: 0,
         orange: 30,
         yellow: 60,
@@ -220,15 +189,118 @@ function colorToHue(color) {
         blue: 240,
         purple: 270,
         magenta: 300,
-        pink: 330
+        pink: 330,
+        lime: 90,
+        aqua: 180,
+        teal: 180,
+        navy: 240,
+        white: 0,
+        black: 0,
+        gray: 0,
+        grey: 0,
+        silver: 0
+
     };
 
 
-    color = color.toLowerCase();
+    color =
+        String(color)
+            .toLowerCase();
 
 
-    if (colors[color] !== undefined) {
-        return colors[color];
+    /*
+    Named color.
+    */
+
+    if (
+        namedColors[color] !==
+        undefined
+    ) {
+
+        return namedColors[color];
+    }
+
+
+    /*
+    Hex color.
+    */
+
+    if (
+        /^#[0-9a-f]{6}$/i.test(color)
+    ) {
+
+        const r =
+            parseInt(
+                color.substring(1, 3),
+                16
+            ) / 255;
+
+        const g =
+            parseInt(
+                color.substring(3, 5),
+                16
+            ) / 255;
+
+        const b =
+            parseInt(
+                color.substring(5, 7),
+                16
+            ) / 255;
+
+
+        const max =
+            Math.max(r, g, b);
+
+        const min =
+            Math.min(r, g, b);
+
+        const difference =
+            max - min;
+
+
+        if (difference === 0) {
+            return 270;
+        }
+
+
+        let hue;
+
+
+        if (max === r) {
+
+            hue =
+                60 *
+                (
+                    ((g - b) / difference) %
+                    6
+                );
+
+        } else if (max === g) {
+
+            hue =
+                60 *
+                (
+                    ((b - r) / difference) +
+                    2
+                );
+
+        } else {
+
+            hue =
+                60 *
+                (
+                    ((r - g) / difference) +
+                    4
+                );
+        }
+
+
+        if (hue < 0) {
+            hue += 360;
+        }
+
+
+        return hue;
     }
 
 
@@ -236,9 +308,19 @@ function colorToHue(color) {
 }
 
 
-function updatePlayerColor(player, color) {
+/*
+============================================================
+UPDATE PLAYER COLOR
+============================================================
+*/
 
-    player.color = color;
+function updatePlayerColor(
+    player,
+    color
+) {
+
+    player.color =
+        color;
 
 
     const bonzi =
@@ -247,11 +329,19 @@ function updatePlayerColor(player, color) {
         );
 
 
+    /*
+    Bonzi uses hue rotation.
+    */
+
     if (bonzi) {
 
         const hue =
             colorToHue(color);
 
+
+        /*
+        Original Bonzi is purple (~270).
+        */
 
         bonzi.style.setProperty(
             "--bonzi-hue",
@@ -261,18 +351,70 @@ function updatePlayerColor(player, color) {
 
 
     /*
-    Only change the background
-    when using the old square.
+    Square uses normal background color.
     */
 
     if (
-        player.character === "square"
+        player.character ===
+        "square"
     ) {
 
         player.element.style.backgroundColor =
             color;
     }
 }
+
+
+/*
+============================================================
+CREATE BONZI IMAGE
+============================================================
+*/
+
+function createBonziImage(
+    player,
+    color
+) {
+
+    const image =
+        document.createElement("img");
+
+
+    image.src =
+        "/bonzi.png";
+
+
+    image.className =
+        "bonziCharacter";
+
+
+    image.draggable =
+        false;
+
+
+    image.alt =
+        "";
+
+
+    const hue =
+        colorToHue(color);
+
+
+    image.style.setProperty(
+        "--bonzi-hue",
+        `${hue - 270}deg`
+    );
+
+
+    return image;
+}
+
+
+/*
+============================================================
+CREATE PLAYER
+============================================================
+*/
 
 function createPlayer(data) {
 
@@ -283,14 +425,13 @@ function createPlayer(data) {
     if (
         players[data.id]
     ) {
+
         return players[data.id];
     }
 
 
     const element =
-        document.createElement(
-            "div"
-        );
+        document.createElement("div");
 
 
     element.className =
@@ -302,80 +443,24 @@ function createPlayer(data) {
 
 
     /*
-    Player name.
+    IMPORTANT:
+    Add myPlayer to YOUR player.
+    This fixes the hand cursor and dragging.
     */
 
-    const nameLabel =
-        document.createElement(
-            "div"
-        );
-
-
-    nameLabel.className =
-        "playerName";
-
-
-    nameLabel.textContent =
-        data.name;
-
-
-    element.appendChild(
-        nameLabel
-    );
-
-
-    /*
-    Position.
-    */
-
-    element.style.left =
-        `${data.x}%`;
-
-    element.style.top =
-        `${data.y}%`;
-
-
-    /*
-    Color.
-    */
-
-    element.style.backgroundColor =
-        data.color ||
-        "#8000ff";
-
-    /*
-    ========================================================
-    CHARACTER
-    ========================================================
-    */
-
-    if (data.character === "bonzi") {
-
-        const image =
-            document.createElement("img");
-
-        image.src =
-            "/bonzi.png";
-
-        image.className =
-            "bonziCharacter";
-
-        element.appendChild(
-            image
-        );
-
-    } else {
+    if (
+        data.id === myId
+    ) {
 
         element.classList.add(
-            "squareCharacter"
+            "myPlayer"
         );
     }
 
 
-    world.appendChild(
-        element
-    );
-
+    /*
+    Player data.
+    */
 
     const player = {
 
@@ -386,31 +471,103 @@ function createPlayer(data) {
             data.name,
 
         x:
-            data.x,
+            Number(data.x),
 
         y:
-            data.y,
+            Number(data.y),
 
         color:
-            data.color,
+            data.color ||
+            "#8000ff",
 
-        character: data.character || "bonzi",
+        character:
+            data.character ||
+            "bonzi",
 
         element:
             element
     };
 
 
-    players[data.id] =
+    /*
+    Position.
+    */
+
+    element.style.left =
+        `${player.x}%`;
+
+    element.style.top =
+        `${player.y}%`;
+
+
+    /*
+    Player name.
+    */
+
+    const nameLabel =
+        document.createElement("div");
+
+
+    nameLabel.className =
+        "playerName";
+
+
+    nameLabel.textContent =
+        player.name;
+
+
+    element.appendChild(
+        nameLabel
+    );
+
+
+    /*
+    Character.
+    */
+
+    if (
+        player.character ===
+        "bonzi"
+    ) {
+
+        const image =
+            createBonziImage(
+                player,
+                player.color
+            );
+
+
+        element.appendChild(
+            image
+        );
+
+    } else {
+
+        element.classList.add(
+            "squareCharacter"
+        );
+
+
+        element.style.backgroundColor =
+            player.color;
+    }
+
+
+    world.appendChild(
+        element
+    );
+
+
+    players[player.id] =
         player;
 
 
     /*
-    Only YOUR player can be dragged.
+    Only YOUR player gets dragging.
     */
 
     if (
-        data.id === myId
+        player.id === myId
     ) {
 
         setupDragging(
@@ -425,103 +582,306 @@ function createPlayer(data) {
 
 /*
 ============================================================
+UPDATE PLAYER CHARACTER
+============================================================
+*/
+
+function updatePlayerCharacter(
+    player,
+    character
+) {
+
+    if (!player) {
+        return;
+    }
+
+
+    player.character =
+        character;
+
+
+    /*
+    Remove existing Bonzi image.
+    */
+
+    const oldBonzi =
+        player.element.querySelector(
+            ".bonziCharacter"
+        );
+
+
+    if (oldBonzi) {
+        oldBonzi.remove();
+    }
+
+
+    /*
+    Remove square styling.
+    */
+
+    player.element.classList.remove(
+        "squareCharacter"
+    );
+
+
+    /*
+    BONZI
+    */
+
+    if (
+        character ===
+        "bonzi"
+    ) {
+
+        player.element.style.backgroundColor =
+            "transparent";
+
+
+        const image =
+            createBonziImage(
+                player,
+                player.color
+            );
+
+
+        player.element.appendChild(
+            image
+        );
+
+
+        /*
+        Make sure Bonzi doesn't interfere
+        with dragging.
+        */
+
+        image.draggable =
+            false;
+
+
+        return;
+    }
+
+
+    /*
+    SQUARE
+    */
+
+    if (
+        character ===
+        "square"
+    ) {
+
+        player.element.classList.add(
+            "squareCharacter"
+        );
+
+
+        player.element.style.backgroundColor =
+            player.color;
+    }
+}
+
+
+/*
+============================================================
 DRAGGING
 ============================================================
 */
 
 function setupDragging(player) {
-    let dragging = false;
 
-    player.element.style.cursor = "grab";
-    player.element.style.touchAction = "none";
-    player.element.style.userSelect = "none";
+    let dragging =
+        false;
 
-    player.element.addEventListener("pointerdown", (event) => {
-        // Only allow YOUR player to be dragged.
-        if (player.id !== myId) {
-            return;
+
+    /*
+    Make the cursor a hand.
+    */
+
+    player.element.style.cursor =
+        "grab";
+
+
+    player.element.style.touchAction =
+        "none";
+
+
+    player.element.style.userSelect =
+        "none";
+
+
+    player.element.addEventListener(
+        "pointerdown",
+        (event) => {
+
+            /*
+            Absolutely prevent dragging
+            another player.
+            */
+
+            if (
+                player.id !== myId
+            ) {
+
+                return;
+            }
+
+
+            dragging =
+                true;
+
+
+            player.element.style.cursor =
+                "grabbing";
+
+
+            try {
+
+                player.element.setPointerCapture(
+                    event.pointerId
+                );
+
+            } catch (error) {
+
+                console.log(
+                    "Pointer capture unavailable."
+                );
+            }
+
+
+            event.preventDefault();
+            event.stopPropagation();
         }
+    );
 
-        dragging = true;
 
-        player.element.style.cursor = "grabbing";
+    player.element.addEventListener(
+        "pointermove",
+        (event) => {
 
-        try {
-            player.element.setPointerCapture(event.pointerId);
-        } catch (error) {
-            console.log("Pointer capture unavailable.");
+            if (!dragging) {
+                return;
+            }
+
+
+            const rect =
+                world.getBoundingClientRect();
+
+
+            let x =
+                (
+                    (
+                        event.clientX -
+                        rect.left
+                    ) /
+                    rect.width
+                ) * 100;
+
+
+            let y =
+                (
+                    (
+                        event.clientY -
+                        rect.top
+                    ) /
+                    rect.height
+                ) * 100;
+
+
+            x =
+                Math.max(
+                    2,
+                    Math.min(98, x)
+                );
+
+
+            y =
+                Math.max(
+                    2,
+                    Math.min(95, y)
+                );
+
+
+            player.x =
+                x;
+
+            player.y =
+                y;
+
+
+            player.element.style.left =
+                `${x}%`;
+
+            player.element.style.top =
+                `${y}%`;
+
+
+            socket.emit(
+                "move",
+                {
+                    x:
+                        x,
+
+                    y:
+                        y
+                }
+            );
+
+
+            event.preventDefault();
         }
+    );
 
-        event.preventDefault();
-        event.stopPropagation();
-    });
-
-    player.element.addEventListener("pointermove", (event) => {
-        if (!dragging) {
-            return;
-        }
-
-        const rect = world.getBoundingClientRect();
-
-        // Convert mouse position to percentage of the world.
-        let x =
-            ((event.clientX - rect.left) / rect.width) * 100;
-
-        let y =
-            ((event.clientY - rect.top) / rect.height) * 100;
-
-        // Keep the character inside the world.
-        x = Math.max(2, Math.min(98, x));
-        y = Math.max(2, Math.min(95, y));
-
-        player.x = x;
-        player.y = y;
-
-        player.element.style.left = `${x}%`;
-        player.element.style.top = `${y}%`;
-
-        // Synchronize with everyone else.
-        socket.emit("move", {
-            x: x,
-            y: y
-        });
-
-        event.preventDefault();
-    });
 
     function stopDragging(event) {
+
         if (!dragging) {
             return;
         }
 
-        dragging = false;
 
-        player.element.style.cursor = "grab";
+        dragging =
+            false;
+
+
+        player.element.style.cursor =
+            "grab";
+
 
         try {
+
             player.element.releasePointerCapture(
                 event.pointerId
             );
+
         } catch (error) {
-            // Pointer capture may already be released.
+            // Already released.
         }
     }
+
 
     player.element.addEventListener(
         "pointerup",
         stopDragging
     );
 
+
     player.element.addEventListener(
         "pointercancel",
         stopDragging
     );
 
+
     player.element.addEventListener(
         "lostpointercapture",
         () => {
-            dragging = false;
-            player.element.style.cursor = "grab";
+
+            dragging =
+                false;
+
+
+            player.element.style.cursor =
+                "grab";
         }
     );
 }
@@ -555,6 +915,7 @@ function joinRoom() {
 
     myName =
         name;
+
 
     currentRoom =
         room;
@@ -623,25 +984,13 @@ socket.on(
             data.id;
 
 
-        /*
-        Hide login.
-        */
-
         loginScreen.style.display =
             "none";
 
 
-        /*
-        Show desktop.
-        */
-
         desktop.style.display =
             "block";
 
-
-        /*
-        Create ourselves.
-        */
 
         createPlayer(
             data
@@ -731,6 +1080,33 @@ socket.on(
 
 /*
 ============================================================
+PLAYER CHARACTER CHANGED
+============================================================
+*/
+
+socket.on(
+    "playerCharacterChanged",
+    (data) => {
+
+        const player =
+            players[data.id];
+
+
+        if (!player) {
+            return;
+        }
+
+
+        updatePlayerCharacter(
+            player,
+            data.character
+        );
+    }
+);
+
+
+/*
+============================================================
 PLAYER LEFT
 ============================================================
 */
@@ -812,10 +1188,6 @@ function showSpeechBubble(
     text
 ) {
 
-    /*
-    Remove previous bubble.
-    */
-
     const oldBubble =
         player.element.querySelector(
             ".speechBubble"
@@ -826,10 +1198,6 @@ function showSpeechBubble(
         oldBubble.remove();
     }
 
-
-    /*
-    Create bubble.
-    */
 
     const bubble =
         document.createElement(
@@ -864,10 +1232,6 @@ function showSpeechBubble(
         if (
             !window.speechSynthesis
         ) {
-
-            console.error(
-                "Browser TTS is unavailable."
-            );
 
             setTimeout(
                 () => {
@@ -916,13 +1280,7 @@ function showSpeechBubble(
 
 
         utterance.onerror =
-            (error) => {
-
-                console.error(
-                    "Browser TTS error:",
-                    error
-                );
-
+            () => {
 
                 if (
                     bubble.parentNode
@@ -961,16 +1319,6 @@ function showSpeechBubble(
             "function"
         ) {
 
-            console.error(
-                "speak.js is not loaded."
-            );
-
-
-            /*
-            Keep the bubble briefly
-            if eSpeak is unavailable.
-            */
-
             setTimeout(
                 () => {
 
@@ -985,14 +1333,9 @@ function showSpeechBubble(
                 5000
             );
 
-
             return;
         }
 
-
-        /*
-        Clear old eSpeak audio.
-        */
 
         const audioContainer =
             document.getElementById(
@@ -1006,10 +1349,6 @@ function showSpeechBubble(
                 "";
         }
 
-
-        /*
-        Start eSpeak.
-        */
 
         speak(
             text,
@@ -1029,12 +1368,8 @@ function showSpeechBubble(
         );
 
 
-        /*
-        Wait for speak.js to
-        create its audio element.
-        */
-
-        let attempts = 0;
+        let attempts =
+            0;
 
 
         const waitForAudio =
@@ -1097,12 +1432,9 @@ function showSpeechBubble(
                     }
 
 
-                    /*
-                    Stop looking after 10 seconds.
-                    */
-
                     if (
-                        attempts >= 200
+                        attempts >=
+                        200
                     ) {
 
                         clearInterval(
@@ -1121,9 +1453,6 @@ function showSpeechBubble(
                 },
                 50
             );
-
-
-        return;
     }
 }
 
@@ -1175,10 +1504,6 @@ messageInput.addEventListener(
     "keydown",
     (event) => {
 
-        /*
-        Enter also sends.
-        */
-
         if (
             event.key ===
             "Enter"
@@ -1205,4 +1530,3 @@ messageInput.addEventListener(
         messageInput.select();
     }
 );
-
