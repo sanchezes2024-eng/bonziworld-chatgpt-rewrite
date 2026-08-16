@@ -6,11 +6,8 @@ html,
 body {
     width: 100%;
     height: 100%;
-
     margin: 0;
-
     overflow: hidden;
-
     font-family: Arial, sans-serif;
 }
 
@@ -164,11 +161,7 @@ PLAYERS
     width: 50px;
     height: 50px;
 
-    background: purple;
-
     transform: translate(-50%, -50%);
-
-    border: 2px solid #300030;
 
     user-select: none;
 
@@ -190,7 +183,7 @@ PLAYERS
 
 /*
 ============================================================
-SQUARE CHARACTER
+SQUARE
 ============================================================
 */
 
@@ -206,12 +199,12 @@ SQUARE CHARACTER
 
 /*
 ============================================================
-BONZI CHARACTER
+BONZI
 ============================================================
 */
 
 /*
-50px × 3.2 = 160px
+50px × 2.1 = 105px
 */
 
 .player.bonziPlayer {
@@ -242,11 +235,6 @@ Bonzi image.
 
     -webkit-user-select: none;
 
-    /*
-    Purple is the base hue,
-    approximately 270 degrees.
-    */
-
     filter:
         hue-rotate(
             var(--bonzi-hue, 0deg)
@@ -256,34 +244,19 @@ Bonzi image.
 
 /*
 ============================================================
-ONLY YOUR PLAYER IS DRAGGABLE
+DRAGGING
 ============================================================
 */
 
-.player.myPlayer {
+.player {
     cursor: grab;
-
-    user-select: none;
-
-    -webkit-user-select: none;
-
-    touch-action: none;
 
     pointer-events: auto;
 }
 
-.player.myPlayer:active {
+.player:active {
     cursor: grabbing;
 }
-
-
-/*
-============================================================
-OTHER PLAYERS
-============================================================
-*/
-
-
 
 
 /*
@@ -330,7 +303,6 @@ SPEECH BUBBLE
     position: absolute;
 
     left: 50%;
-
     bottom: 100%;
 
     transform: translateX(-50%);
@@ -372,13 +344,11 @@ SPEECH BUBBLE
     position: absolute;
 
     left: 50%;
-
     top: 100%;
 
     transform: translateX(-50%);
 
     border-left: 7px solid transparent;
-
     border-right: 7px solid transparent;
 
     border-top: 7px solid white;
@@ -551,7 +521,7 @@ SETTINGS PANEL
 
 /*
 ============================================================
-README LINK
+README
 ============================================================
 */
 
@@ -561,7 +531,7 @@ README LINK
     right: 12px;
     bottom: 10px;
 
-    color: #ffffff;
+    color: white;
 
     font-size: 13px;
 
