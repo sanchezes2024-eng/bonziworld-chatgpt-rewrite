@@ -278,6 +278,34 @@ function createPlayer(data) {
         data.color ||
         "#8000ff";
 
+    /*
+    ========================================================
+    CHARACTER
+    ========================================================
+    */
+
+    if (data.character === "bonzi") {
+
+        const image =
+            document.createElement("img");
+
+        image.src =
+            "/bonzi.png";
+
+        image.className =
+            "bonziCharacter";
+
+        element.appendChild(
+            image
+        );
+
+    } else {
+
+        element.classList.add(
+            "squareCharacter"
+        );
+    }
+
 
     world.appendChild(
         element
