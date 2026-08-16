@@ -209,6 +209,71 @@ CREATE PLAYER
 ============================================================
 */
 
+function colorToHue(color) {
+
+    const colors = {
+        red: 0,
+        orange: 30,
+        yellow: 60,
+        green: 120,
+        cyan: 180,
+        blue: 240,
+        purple: 270,
+        magenta: 300,
+        pink: 330
+    };
+
+
+    color = color.toLowerCase();
+
+
+    if (colors[color] !== undefined) {
+        return colors[color];
+    }
+
+
+    return 270;
+}
+
+
+function updatePlayerColor(player, color) {
+
+    player.color = color;
+
+
+    const bonzi =
+        player.element.querySelector(
+            ".bonziCharacter"
+        );
+
+
+    if (bonzi) {
+
+        const hue =
+            colorToHue(color);
+
+
+        bonzi.style.setProperty(
+            "--bonzi-hue",
+            `${hue - 270}deg`
+        );
+    }
+
+
+    /*
+    Only change the background
+    when using the old square.
+    */
+
+    if (
+        player.character === "square"
+    ) {
+
+        player.element.style.backgroundColor =
+            color;
+    }
+}
+
 function createPlayer(data) {
 
     /*
@@ -327,8 +392,9 @@ function createPlayer(data) {
             data.y,
 
         color:
-            data.color ||
-            "#8000ff",
+            data.color,
+
+        character: data.character || "bonzi",
 
         element:
             element
@@ -655,12 +721,10 @@ socket.on(
         }
 
 
-        player.color =
-            data.color;
-
-
-        player.element.style.backgroundColor =
-            data.color;
+        updatePlayerColor(
+            player,
+            data.color
+        );
     }
 );
 
