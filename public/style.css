@@ -1,4 +1,3 @@
-
 * {
     box-sizing: border-box;
 }
@@ -118,7 +117,8 @@ DESKTOP
 
     display: none;
 
-    background-image: url("/background.png");
+    background-image:
+        url("/background.png");
 
     background-size: cover;
 
@@ -145,10 +145,6 @@ WORLD
 
     overflow: hidden;
 
-    /*
-    Important for pointer dragging.
-    */
-
     touch-action: none;
 
     user-select: none;
@@ -163,7 +159,94 @@ PLAYERS
 ============================================================
 */
 
+.player {
+    position: absolute;
+
+    width: 50px;
+    height: 50px;
+
+    transform:
+        translate(-50%, -50%);
+
+    border: 2px solid #300030;
+
+    user-select: none;
+
+    -webkit-user-select: none;
+
+    touch-action: none;
+
+    pointer-events: auto;
+
+    z-index: 5;
+
+    cursor: default;
+}
+
+
+/*
+============================================================
+YOUR PLAYER
+============================================================
+*/
+
+.player.myPlayer {
+    cursor: grab;
+
+    user-select: none;
+
+    -webkit-user-select: none;
+
+    touch-action: none;
+
+    pointer-events: auto;
+}
+
+.player.myPlayer:active {
+    cursor: grabbing;
+}
+
+
+/*
+============================================================
+OTHER PLAYERS
+============================================================
+*/
+
+.player:not(.myPlayer) {
+    cursor: default;
+
+    /*
+    IMPORTANT:
+    Other players cannot receive
+    pointer events, so they cannot
+    accidentally be dragged.
+    */
+
+    pointer-events: none;
+}
+
+
+/*
+============================================================
+SQUARE CHARACTER
+============================================================
+*/
+
+.player.squareCharacter {
+    background: purple;
+}
+
+
+/*
+============================================================
+BONZI CHARACTER
+============================================================
+*/
+
 .bonziCharacter {
+    display: block;
+
     width: 100%;
     height: 100%;
 
@@ -175,95 +258,17 @@ PLAYERS
 
     -webkit-user-select: none;
 
-    /*
-    The JavaScript changes this
-    custom property for each player.
-    */
-
-    filter: hue-rotate(
-        var(--bonzi-hue, 0deg)
-    );
-}
-
-.squareCharacter {
-    width: 100%;
-    height: 100%;
-
-    background: purple;
-}
-
-.player {
-    position: absolute;
-
-    width: 50px;
-    height: 50px;
-
-    background: purple;
-
-    transform: translate(-50%, -50%);
-
-    border: 2px solid #300030;
-
-    user-select: none;
-
-    -webkit-user-select: none;
-
-    touch-action: none;
-
-    cursor: grab;
-
-    pointer-events: auto;
-
-    z-index: 5;
-}
-
-.player:active {
-    cursor: grabbing;
-}
-
-/*
-ONLY YOUR PLAYER IS DRAGGABLE
-*/
-
-.player.myPlayer {
-    cursor: grab;
+    -webkit-user-drag: none;
 
     /*
-    Prevent the browser from treating
-    dragging as text selection.
+    JavaScript changes --bonzi-hue.
+    Original Bonzi is approximately purple.
     */
 
-    user-select: none;
-
-    -webkit-user-select: none;
-
-    touch-action: none;
-
-    /*
-    Make sure your player receives
-    pointer events.
-    */
-
-    pointer-events: auto;
-}
-
-.player.myPlayer:active {
-    cursor: grabbing;
-}
-
-
-/*
-OTHER PLAYERS
-*/
-
-.player:not(.myPlayer) {
-    cursor: default;
-
-    /*
-    Other players cannot be dragged.
-    */
-
-    
+    filter:
+        hue-rotate(
+            var(--bonzi-hue, 0deg)
+        );
 }
 
 
@@ -280,7 +285,8 @@ PLAYER NAME
 
     bottom: 100%;
 
-    transform: translateX(-50%);
+    transform:
+        translateX(-50%);
 
     margin-bottom: 5px;
 
@@ -298,8 +304,9 @@ PLAYER NAME
     user-select: none;
 
     -webkit-user-select: none;
-}
 
+    z-index: 10;
+}
 
 
 /*
@@ -315,7 +322,8 @@ SPEECH BUBBLE
 
     bottom: 100%;
 
-    transform: translateX(-50%);
+    transform:
+        translateX(-50%);
 
     margin-bottom: 28px;
 
@@ -357,13 +365,17 @@ SPEECH BUBBLE
 
     top: 100%;
 
-    transform: translateX(-50%);
+    transform:
+        translateX(-50%);
 
-    border-left: 7px solid transparent;
+    border-left:
+        7px solid transparent;
 
-    border-right: 7px solid transparent;
+    border-right:
+        7px solid transparent;
 
-    border-top: 7px solid white;
+    border-top:
+        7px solid white;
 }
 
 
@@ -388,7 +400,8 @@ TASKBAR
 
     background: #c0c0c0;
 
-    border-top: 2px solid #eeeeee;
+    border-top:
+        2px solid #eeeeee;
 
     z-index: 100;
 }
@@ -402,7 +415,8 @@ TASKBAR
 
     background: #c0c0c0;
 
-    border: 2px outset #eeeeee;
+    border:
+        2px outset #eeeeee;
 
     font-weight: bold;
 
@@ -426,7 +440,8 @@ TASKBAR
 
     font-size: 16px;
 
-    border: 2px inset #eeeeee;
+    border:
+        2px inset #eeeeee;
 
     outline: none;
 }
@@ -450,7 +465,8 @@ SETTINGS BUTTON
 
     color: black;
 
-    border: 2px outset #eeeeee;
+    border:
+        2px outset #eeeeee;
 
     font-size: 14px;
 
@@ -486,10 +502,12 @@ SETTINGS PANEL
 
     background: #c0c0c0;
 
-    border: 2px outset #eeeeee;
+    border:
+        2px outset #eeeeee;
 
     box-shadow:
-        4px 4px 10px rgba(0, 0, 0, 0.4);
+        4px 4px 10px
+        rgba(0, 0, 0, 0.4);
 
     display: none;
 
@@ -521,7 +539,8 @@ SETTINGS PANEL
 
     background: #c0c0c0;
 
-    border: 2px outset #eeeeee;
+    border:
+        2px outset #eeeeee;
 
     cursor: pointer;
 }
@@ -529,6 +548,13 @@ SETTINGS PANEL
 #settingsPanel button:active {
     border-style: inset;
 }
+
+
+/*
+============================================================
+README LINK
+============================================================
+*/
 
 #readmeLink {
     position: fixed;
