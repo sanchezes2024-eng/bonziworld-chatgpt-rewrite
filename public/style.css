@@ -117,8 +117,7 @@ DESKTOP
 
     display: none;
 
-    background-image:
-        url("/background.png");
+    background-image: url("/background.png");
 
     background-size: cover;
 
@@ -165,8 +164,9 @@ PLAYERS
     width: 50px;
     height: 50px;
 
-    transform:
-        translate(-50%, -50%);
+    background: purple;
+
+    transform: translate(-50%, -50%);
 
     border: 2px solid #300030;
 
@@ -176,17 +176,87 @@ PLAYERS
 
     touch-action: none;
 
+    cursor: grab;
+
     pointer-events: auto;
 
     z-index: 5;
+}
 
-    cursor: default;
+.player:active {
+    cursor: grabbing;
 }
 
 
 /*
 ============================================================
-YOUR PLAYER
+SQUARE CHARACTER
+============================================================
+*/
+
+.player.squareCharacter {
+    width: 50px;
+    height: 50px;
+
+    background: purple;
+
+    border: 2px solid #300030;
+}
+
+
+/*
+============================================================
+BONZI CHARACTER
+============================================================
+*/
+
+/*
+50px × 3.2 = 160px
+*/
+
+.player.bonziPlayer {
+    width: 160px;
+    height: 160px;
+
+    background: transparent;
+
+    border: none;
+}
+
+
+/*
+Bonzi image.
+*/
+
+.bonziCharacter {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: contain;
+
+    pointer-events: none;
+
+    user-select: none;
+
+    -webkit-user-select: none;
+
+    /*
+    Purple is the base hue,
+    approximately 270 degrees.
+    */
+
+    filter:
+        hue-rotate(
+            var(--bonzi-hue, 0deg)
+        );
+}
+
+
+/*
+============================================================
+ONLY YOUR PLAYER IS DRAGGABLE
 ============================================================
 */
 
@@ -217,58 +287,13 @@ OTHER PLAYERS
     cursor: default;
 
     /*
-    IMPORTANT:
-    Other players cannot receive
+    This is important:
+    other players cannot receive
     pointer events, so they cannot
     accidentally be dragged.
     */
 
     pointer-events: none;
-}
-
-
-/*
-============================================================
-SQUARE CHARACTER
-============================================================
-*/
-
-.player.squareCharacter {
-    background: purple;
-}
-
-
-/*
-============================================================
-BONZI CHARACTER
-============================================================
-*/
-
-.bonziCharacter {
-    display: block;
-
-    width: 100%;
-    height: 100%;
-
-    object-fit: contain;
-
-    pointer-events: none;
-
-    user-select: none;
-
-    -webkit-user-select: none;
-
-    -webkit-user-drag: none;
-
-    /*
-    JavaScript changes --bonzi-hue.
-    Original Bonzi is approximately purple.
-    */
-
-    filter:
-        hue-rotate(
-            var(--bonzi-hue, 0deg)
-        );
 }
 
 
@@ -285,8 +310,7 @@ PLAYER NAME
 
     bottom: 100%;
 
-    transform:
-        translateX(-50%);
+    transform: translateX(-50%);
 
     margin-bottom: 5px;
 
@@ -304,8 +328,6 @@ PLAYER NAME
     user-select: none;
 
     -webkit-user-select: none;
-
-    z-index: 10;
 }
 
 
@@ -322,8 +344,7 @@ SPEECH BUBBLE
 
     bottom: 100%;
 
-    transform:
-        translateX(-50%);
+    transform: translateX(-50%);
 
     margin-bottom: 28px;
 
@@ -365,17 +386,13 @@ SPEECH BUBBLE
 
     top: 100%;
 
-    transform:
-        translateX(-50%);
+    transform: translateX(-50%);
 
-    border-left:
-        7px solid transparent;
+    border-left: 7px solid transparent;
 
-    border-right:
-        7px solid transparent;
+    border-right: 7px solid transparent;
 
-    border-top:
-        7px solid white;
+    border-top: 7px solid white;
 }
 
 
@@ -400,8 +417,7 @@ TASKBAR
 
     background: #c0c0c0;
 
-    border-top:
-        2px solid #eeeeee;
+    border-top: 2px solid #eeeeee;
 
     z-index: 100;
 }
@@ -415,8 +431,7 @@ TASKBAR
 
     background: #c0c0c0;
 
-    border:
-        2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
     font-weight: bold;
 
@@ -440,8 +455,7 @@ TASKBAR
 
     font-size: 16px;
 
-    border:
-        2px inset #eeeeee;
+    border: 2px inset #eeeeee;
 
     outline: none;
 }
@@ -465,8 +479,7 @@ SETTINGS BUTTON
 
     color: black;
 
-    border:
-        2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
     font-size: 14px;
 
@@ -502,12 +515,10 @@ SETTINGS PANEL
 
     background: #c0c0c0;
 
-    border:
-        2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
     box-shadow:
-        4px 4px 10px
-        rgba(0, 0, 0, 0.4);
+        4px 4px 10px rgba(0, 0, 0, 0.4);
 
     display: none;
 
@@ -539,8 +550,7 @@ SETTINGS PANEL
 
     background: #c0c0c0;
 
-    border:
-        2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
     cursor: pointer;
 }
