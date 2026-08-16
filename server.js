@@ -1,4 +1,3 @@
-
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -14,6 +13,7 @@ RANDOM COLORS
 */
 
 function randomColor() {
+
     const colors = [
         "#ff0000",
         "#00ff00",
@@ -31,7 +31,9 @@ function randomColor() {
     ];
 
     return colors[
-        Math.floor(Math.random() * colors.length)
+        Math.floor(
+            Math.random() * colors.length
+        )
     ];
 }
 
@@ -44,14 +46,10 @@ HTTP SERVER
 
 const server = http.createServer((req, res) => {
 
-    let filePath;
-
-    /*
-    Remove query strings.
-    */
-
     const url =
         req.url.split("?")[0];
+
+    let filePath;
 
 
     if (
@@ -59,99 +57,88 @@ const server = http.createServer((req, res) => {
         url === "/index.html"
     ) {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "index.html"
-            );
+        filePath = path.join(
+            __dirname,
+            "public",
+            "index.html"
+        );
 
     } else if (url === "/readme.html") {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "readme.html"
-            );
-        
+        filePath = path.join(
+            __dirname,
+            "public",
+            "readme.html"
+        );
+
     } else if (url === "/readme.css") {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "readme.css"
-            );
-
+        filePath = path.join(
+            __dirname,
+            "public",
+            "readme.css"
+        );
 
     } else if (url === "/style.css") {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "style.css"
-            );
+        filePath = path.join(
+            __dirname,
+            "public",
+            "style.css"
+        );
 
     } else if (url === "/script.js") {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "script.js"
-            );
+        filePath = path.join(
+            __dirname,
+            "public",
+            "script.js"
+        );
 
     } else if (url === "/background.png") {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "background.png"
-            );
+        filePath = path.join(
+            __dirname,
+            "public",
+            "background.png"
+        );
+
+    } else if (url === "/bonzi.png") {
+
+        filePath = path.join(
+            __dirname,
+            "public",
+            "bonzi.png"
+        );
 
     } else if (url === "/speakClient.js") {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "speakClient.js"
-            );
+        filePath = path.join(
+            __dirname,
+            "public",
+            "speakClient.js"
+        );
 
     } else if (url === "/speakWorker.js") {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "speakWorker.js"
-            );
+        filePath = path.join(
+            __dirname,
+            "public",
+            "speakWorker.js"
+        );
 
     } else if (url === "/speakGenerator.js") {
 
-        filePath =
-            path.join(
-                __dirname,
-                "public",
-                "speakGenerator.js"
-            );
-     } else if (url === "/bonzi.png") {
-
-         filePath =
-             path.join(
-                 __dirname,
-                 "public",
-                 "bonzi.png"
-             );
+        filePath = path.join(
+            __dirname,
+            "public",
+            "speakGenerator.js"
+        );
 
     } else {
 
         res.writeHead(404);
         res.end("Not Found");
-
         return;
     }
 
@@ -196,10 +183,7 @@ const server = http.createServer((req, res) => {
                 );
 
                 res.writeHead(500);
-
-                res.end(
-                    "Server Error"
-                );
+                res.end("Server Error");
 
                 return;
             }
@@ -278,10 +262,6 @@ io.on(
                 }
 
 
-                /*
-                Save player information.
-                */
-
                 socket.data.name =
                     name;
 
@@ -301,26 +281,29 @@ io.on(
 
 
                 /*
-                Player color is random.
+                Every new player gets
+                a random color.
                 */
 
                 socket.data.color =
                     randomColor();
 
+
+                /*
+                Bonzi is the default character.
+                */
+
                 socket.data.character =
                     "bonzi";
 
-
-                /*
-                Join Socket.IO room.
-                */
 
                 socket.join(room);
 
 
                 /*
-                Tell the new player
-                about themselves.
+                =================================================
+                Tell the new player about themselves.
+                =================================================
                 */
 
                 socket.emit(
@@ -343,7 +326,7 @@ io.on(
 
                         color:
                             socket.data.color,
-                        
+
                         character:
                             socket.data.character
                     }
@@ -351,8 +334,9 @@ io.on(
 
 
                 /*
-                Tell everyone else
-                about the new player.
+                =================================================
+                Tell everyone else about the new player.
+                =================================================
                 */
 
                 socket.to(room).emit(
@@ -372,7 +356,7 @@ io.on(
 
                         color:
                             socket.data.color,
-                        
+
                         character:
                             socket.data.character
                     }
@@ -380,8 +364,9 @@ io.on(
 
 
                 /*
-                Send existing players
-                to the new player.
+                =================================================
+                Send existing players to the new player.
+                =================================================
                 */
 
                 const roomSockets =
@@ -431,10 +416,9 @@ io.on(
 
                                 color:
                                     otherSocket.data.color,
-                                
+
                                 character:
                                     otherSocket.data.character
-                                    
                             }
                         );
                     }
@@ -482,29 +466,16 @@ io.on(
                 }
 
 
-                /*
-                Keep players inside
-                the desktop.
-                */
-
-                x =
-                    Math.max(
-                        2,
-                        Math.min(
-                            98,
-                            x
-                        )
-                    );
+                x = Math.max(
+                    2,
+                    Math.min(98, x)
+                );
 
 
-                y =
-                    Math.max(
-                        2,
-                        Math.min(
-                            98,
-                            y
-                        )
-                    );
+                y = Math.max(
+                    2,
+                    Math.min(98, y)
+                );
 
 
                 socket.data.x =
@@ -513,11 +484,6 @@ io.on(
                 socket.data.y =
                     y;
 
-
-                /*
-                Send movement to everyone
-                except the person moving.
-                */
 
                 socket.to(room).emit(
                     "playerMoved",
@@ -548,7 +514,6 @@ io.on(
 
                 const room =
                     socket.data.room;
-
 
                 const name =
                     socket.data.name;
@@ -587,30 +552,25 @@ io.on(
 
                 /*
                 =================================================
-                /color COMMAND
+                /color
                 =================================================
                 */
 
-                if (
-                    message
-                        .toLowerCase()
-                        .startsWith(
-                            "/color"
-                        )
-                ) {
+                const colorCommand =
+                    message.match(
+                        /^\/color(?:\s+(.*))?$/i
+                    );
 
-                    const parts =
-                        message
-                            .trim()
-                            .split(/\s+/);
 
+                if (colorCommand) {
 
                     let color =
-                        parts[1];
+                        colorCommand[1]
+                            ?.trim();
 
 
                     /*
-                    /color
+                    /color by itself
                     gives a random color.
                     */
 
@@ -625,22 +585,13 @@ io.on(
                             color.toLowerCase();
 
 
-                        /*
-                        Hex color.
-                        */
-
                         const isHex =
                             /^#[0-9a-f]{6}$/i
-                                .test(
-                                    color
-                                );
+                                .test(color);
 
-
-                        /*
-                        Common CSS colors.
-                        */
 
                         const allowedColors = [
+
                             "red",
                             "green",
                             "blue",
@@ -659,6 +610,7 @@ io.on(
                             "navy",
                             "teal",
                             "silver"
+
                         ];
 
 
@@ -686,18 +638,9 @@ io.on(
                     }
 
 
-                    /*
-                    Save the new color.
-                    */
-
                     socket.data.color =
                         color;
 
-
-                    /*
-                    Tell everyone in
-                    the room.
-                    */
 
                     io.to(room).emit(
                         "playerColorChanged",
@@ -711,49 +654,43 @@ io.on(
                     );
 
 
-                    /*
-                    Don't create a normal
-                    speech bubble for /color.
-                    */
-
                     return;
                 }
-                
+
+
                 /*
                 =================================================
-                /char COMMAND
+                /char
                 =================================================
                 */
 
-                if (
-                    message
-                        .toLowerCase()
-                        .startsWith("/char")
-                ) {
+                const charCommand =
+                    message.match(
+                        /^\/char(?:\s+(.*))?$/i
+                    );
 
-                    const parts =
-                        message
-                            .trim()
-                            .split(/\s+/);
 
+                if (charCommand) {
 
                     let character =
-                        parts[1]?.toLowerCase();
+                        charCommand[1]
+                            ?.trim()
+                            .toLowerCase();
 
 
                     /*
-                    /char by itself toggles
-                    between Bonzi and square.
+                    /char toggles.
                     */
 
                     if (!character) {
 
                         character =
-                            socket.data.character === "bonzi"
+                            socket.data.character ===
+                            "bonzi"
                                 ? "square"
                                 : "bonzi";
                     }
-                    
+
 
                     if (
                         character !== "bonzi" &&
@@ -776,10 +713,6 @@ io.on(
                         character;
 
 
-                    /*
-                    Tell everyone in the room.
-                    */
-
                     io.to(room).emit(
                         "playerCharacterChanged",
                         {
@@ -792,14 +725,9 @@ io.on(
                     );
 
 
-                    /*
-                    Don't create a normal
-                    speech bubble for /char.
-                    */
-
                     return;
                 }
-                    
+
 
                 /*
                 =================================================
@@ -876,4 +804,3 @@ server.listen(
         );
     }
 );
-
