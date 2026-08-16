@@ -342,7 +342,10 @@ io.on(
                             socket.data.y,
 
                         color:
-                            socket.data.color
+                            socket.data.color,
+                        
+                        character:
+                            socket.data.character
                     }
                 );
 
@@ -368,7 +371,10 @@ io.on(
                             socket.data.y,
 
                         color:
-                            socket.data.color
+                            socket.data.color,
+                        
+                        character:
+                            socket.data.character
                     }
                 );
 
@@ -424,7 +430,11 @@ io.on(
                                     otherSocket.data.y,
 
                                 color:
-                                    otherSocket.data.color
+                                    otherSocket.data.color,
+                                
+                                character:
+                                    otherSocket.data.character
+                                    
                             }
                         );
                     }
@@ -708,7 +718,88 @@ io.on(
 
                     return;
                 }
+                
+                /*
+                =================================================
+                /char COMMAND
+                =================================================
+                */
 
+                if (
+                    message
+                        .toLowerCase()
+                        .startsWith("/char")
+                ) {
+
+                    const parts =
+                        message
+                            .trim()
+                            .split(/\s+/);
+
+
+                    let character =
+                        parts[1]?.toLowerCase();
+
+
+                    /*
+                    /char by itself toggles
+                    between Bonzi and square.
+                    */
+
+                    if (!character) {
+
+                        character =
+                            socket.data.character === "bonzi"
+                                ? "square"
+                                : "bonzi";
+                    }
+                    
+
+                    if (
+                        character !== "bonzi" &&
+                        character !== "square"
+                    ) {
+
+                        socket.emit(
+                            "systemMessage",
+                            {
+                                text:
+                                    "Invalid character. Use /char bonzi, /char square, or /char."
+                            }
+                        );
+
+                        return;
+                    }
+
+
+                    socket.data.character =
+                        character;
+
+
+                    /*
+                    Tell everyone in the room.
+                    */
+
+                    io.to(room).emit(
+                        "playerCharacterChanged",
+                        {
+                            id:
+                                socket.id,
+
+                            character:
+                                character
+                        }
+                    );
+
+
+                    /*
+                    Don't create a normal
+                    speech bubble for /char.
+                    */
+
+                    return;
+                }
+                    
 
                 /*
                 =================================================
