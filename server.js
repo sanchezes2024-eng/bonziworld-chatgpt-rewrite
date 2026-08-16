@@ -138,6 +138,14 @@ const server = http.createServer((req, res) => {
                 "public",
                 "speakGenerator.js"
             );
+     } else if (url === "/bonzi.png") {
+
+         filePath =
+             path.join(
+                 __dirname,
+                 "public",
+                 "bonzi.png"
+             );
 
     } else {
 
