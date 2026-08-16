@@ -307,6 +307,9 @@ io.on(
                 socket.data.color =
                     randomColor();
 
+                socket.data.character =
+                    "bonzi";
+
 
                 /*
                 Join Socket.IO room.
