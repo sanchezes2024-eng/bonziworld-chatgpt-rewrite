@@ -31,7 +31,6 @@ function randomColor() {
         "#ffffff"
     ];
 
-
     return colors[
         Math.floor(
             Math.random() * colors.length
@@ -170,10 +169,7 @@ const server =
             } else {
 
                 res.writeHead(404);
-
-                res.end(
-                    "Not Found"
-                );
+                res.end("Not Found");
 
                 return;
             }
@@ -340,9 +336,7 @@ io.on(
 
 
                 /*
-                =================================================
-                SEND PLAYER THEIR OWN DATA
-                =================================================
+                Send own data.
                 */
 
                 socket.emit(
@@ -373,9 +367,7 @@ io.on(
 
 
                 /*
-                =================================================
-                TELL EXISTING PLAYERS
-                =================================================
+                Tell everyone else immediately.
                 */
 
                 socket.to(room).emit(
@@ -403,9 +395,7 @@ io.on(
 
 
                 /*
-                =================================================
-                SEND EXISTING PLAYERS TO NEW PLAYER
-                =================================================
+                Send existing players to newcomer.
                 */
 
                 const roomSockets =
@@ -475,18 +465,6 @@ io.on(
         ====================================================
         MOVEMENT
         ====================================================
-        
-        Anyone can move any player.
-        
-        The client sends:
-        
-        {
-            id: targetPlayerId,
-            x: newX,
-            y: newY
-        }
-        
-        ====================================================
         */
 
         socket.on(
@@ -503,28 +481,24 @@ io.on(
 
 
                 /*
-                Get the player that is actually
-                being dragged.
+                The client tells us exactly
+                which player was dragged.
                 */
 
-                const targetId =
+                const playerId =
                     String(
-                        data?.id || ""
+                        data?.playerId || ""
                     );
 
 
-                if (!targetId) {
+                if (!playerId) {
                     return;
                 }
 
 
-                /*
-                Make sure the target player exists.
-                */
-
                 const targetSocket =
                     io.sockets.sockets.get(
-                        targetId
+                        playerId
                     );
 
 
@@ -534,8 +508,8 @@ io.on(
 
 
                 /*
-                Make sure the target player
-                is in the same room.
+                Make sure the target is
+                actually in the same room.
                 */
 
                 if (
@@ -556,15 +530,9 @@ io.on(
                     !Number.isFinite(x) ||
                     !Number.isFinite(y)
                 ) {
-
                     return;
                 }
 
-
-                /*
-                Keep the player inside
-                the world.
-                */
 
                 x =
                     Math.max(
@@ -587,8 +555,9 @@ io.on(
 
 
                 /*
-                Update the TARGET player's
-                stored position.
+                Update the PLAYER BEING DRAGGED,
+                not necessarily the person who
+                sent the event.
                 */
 
                 targetSocket.data.x =
@@ -599,15 +568,14 @@ io.on(
 
 
                 /*
-                Tell everyone in the room
-                which player moved.
+                Tell everybody in the room.
                 */
 
                 io.to(room).emit(
                     "playerMoved",
                     {
                         id:
-                            targetId,
+                            playerId,
 
                         x:
                             x,
@@ -641,7 +609,6 @@ io.on(
                     !room ||
                     !name
                 ) {
-
                     return;
                 }
 
@@ -797,10 +764,6 @@ io.on(
                         parts[1]?.toLowerCase();
 
 
-                    /*
-                    /char toggles.
-                    */
-
                     if (!character) {
 
                         character =
@@ -830,10 +793,6 @@ io.on(
                     socket.data.character =
                         character;
 
-
-                    /*
-                    Tell everyone.
-                    */
 
                     io.to(room).emit(
                         "playerCharacterChanged",
