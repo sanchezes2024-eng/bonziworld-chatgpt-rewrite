@@ -1,115 +1,36 @@
 const socket = io();
 
-
 /*
 ============================================================
 ELEMENTS
 ============================================================
 */
 
-const loginScreen =
-    document.getElementById("loginScreen");
+const loginScreen = document.getElementById("loginScreen");
+const desktop = document.getElementById("desktop");
+const nameInput = document.getElementById("nameInput");
+const roomInput = document.getElementById("roomInput");
+const submitButton = document.getElementById("submitButton");
+const world = document.getElementById("world");
+const messageInput = document.getElementById("messageInput");
+const startButton = document.getElementById("startButton");
 
-const desktop =
-    document.getElementById("desktop");
-
-const nameInput =
-    document.getElementById("nameInput");
-
-const roomInput =
-    document.getElementById("roomInput");
-
-const submitButton =
-    document.getElementById("submitButton");
-
-const world =
-    document.getElementById("world");
-
-const messageInput =
-    document.getElementById("messageInput");
-
-const startButton =
-    document.getElementById("startButton");
-
-const settingsButton =
-    document.getElementById("settingsButton");
-
-const settingsPanel =
-    document.getElementById("settingsPanel");
-
-const closeSettings =
-    document.getElementById("closeSettings");
-
-const ttsOptions =
-    document.querySelectorAll(
-        'input[name="ttsMode"]'
-    );
-
-
-/*
-============================================================
-TTS
-============================================================
-*/
-
-let ttsMode =
-    localStorage.getItem("ttsMode") ||
-    "browser";
-
-
-ttsOptions.forEach(
-    (option) => {
-
-        option.checked =
-            option.value === ttsMode;
-
-
-        option.addEventListener(
-            "change",
-            () => {
-
-                if (!option.checked) {
-                    return;
-                }
-
-
-                ttsMode =
-                    option.value;
-
-
-                localStorage.setItem(
-                    "ttsMode",
-                    ttsMode
-                );
-
-
-                if (
-                    window.speechSynthesis
-                ) {
-
-                    window.speechSynthesis.cancel();
-                }
-            }
-        );
-    }
+const settingsButton = document.getElementById("settingsButton");
+const settingsPanel = document.getElementById("settingsPanel");
+const closeSettings = document.getElementById("closeSettings");
+const ttsOptions = document.querySelectorAll(
+    'input[name="ttsMode"]'
 );
 
-
-/*
-============================================================
-PLAYER DATA
-============================================================
-*/
+let ttsMode =
+    localStorage.getItem("ttsMode") || "browser";
 
 const players = {};
 
 let myId = null;
-
 let myName = "";
-
 let currentRoom = "default";
 
-let currentlyDraggingPlayer = null;
 
 /*
 ============================================================
@@ -118,9 +39,7 @@ DEFAULT ROOM
 */
 
 if (roomInput) {
-
-    roomInput.value =
-        "default";
+    roomInput.value = "default";
 }
 
 
@@ -132,30 +51,52 @@ SETTINGS
 
 if (settingsButton) {
 
-    settingsButton.addEventListener(
-        "click",
-        () => {
+    settingsButton.addEventListener("click", () => {
 
-            settingsPanel.style.display =
-                settingsPanel.style.display === "block"
-                    ? "none"
-                    : "block";
+        if (settingsPanel.style.display === "block") {
+            settingsPanel.style.display = "none";
+        } else {
+            settingsPanel.style.display = "block";
         }
-    );
+
+    });
 }
 
 
 if (closeSettings) {
 
-    closeSettings.addEventListener(
-        "click",
-        () => {
+    closeSettings.addEventListener("click", () => {
+        settingsPanel.style.display = "none";
+    });
 
-            settingsPanel.style.display =
-                "none";
-        }
-    );
 }
+
+
+ttsOptions.forEach((option) => {
+
+    option.checked =
+        option.value === ttsMode;
+
+    option.addEventListener("change", () => {
+
+        if (!option.checked) {
+            return;
+        }
+
+        ttsMode = option.value;
+
+        localStorage.setItem(
+            "ttsMode",
+            ttsMode
+        );
+
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+
+    });
+
+});
 
 
 /*
@@ -170,9 +111,7 @@ function colorToHue(color) {
         return 270;
     }
 
-
     const colors = {
-
         red: 0,
         orange: 30,
         yellow: 60,
@@ -181,111 +120,34 @@ function colorToHue(color) {
         blue: 240,
         purple: 270,
         magenta: 300,
-        pink: 330,
-
-        black: 270,
-        gray: 270,
-        grey: 270,
-        lime: 90,
-        aqua: 180,
-        navy: 240,
-        teal: 180,
-        silver: 270,
-        white: 270
-
+        pink: 330
     };
 
+    color = color.toLowerCase();
 
-    color =
-        color.toLowerCase();
-
-
-    if (
-        colors[color] !== undefined
-    ) {
-
+    if (colors[color] !== undefined) {
         return colors[color];
     }
 
+    const hexColors = {
+        "#ff0000": 0,
+        "#00ff00": 120,
+        "#0000ff": 240,
+        "#ffff00": 60,
+        "#ff00ff": 300,
+        "#00ffff": 180,
+        "#ff8800": 30,
+        "#8800ff": 270,
+        "#00aa88": 168,
+        "#ff66aa": 330,
+        "#6666ff": 240,
+        "#66cc66": 120,
+        "#ffffff": 270
+    };
 
-    /*
-    Handle hex colors.
-    */
-
-    if (
-        /^#[0-9a-f]{6}$/i.test(color)
-    ) {
-
-        const r =
-            parseInt(
-                color.substring(1, 3),
-                16
-            );
-
-        const g =
-            parseInt(
-                color.substring(3, 5),
-                16
-            );
-
-        const b =
-            parseInt(
-                color.substring(5, 7),
-                16
-            );
-
-
-        const max =
-            Math.max(r, g, b);
-
-        const min =
-            Math.min(r, g, b);
-
-
-        if (max === min) {
-            return 270;
-        }
-
-
-        let hue;
-
-
-        if (max === r) {
-
-            hue =
-                60 * (
-                    (g - b) /
-                    (max - min)
-                );
-
-        } else if (max === g) {
-
-            hue =
-                60 * (
-                    2 +
-                    (b - r) /
-                    (max - min)
-                );
-
-        } else {
-
-            hue =
-                60 * (
-                    4 +
-                    (r - g) /
-                    (max - min)
-                );
-        }
-
-
-        if (hue < 0) {
-            hue += 360;
-        }
-
-
-        return hue;
+    if (hexColors[color] !== undefined) {
+        return hexColors[color];
     }
-
 
     return 270;
 }
@@ -297,26 +159,19 @@ UPDATE PLAYER COLOR
 ============================================================
 */
 
-function updatePlayerColor(
-    player,
-    color
-) {
+function updatePlayerColor(player, color) {
 
-    player.color =
-        color;
-
+    player.color = color;
 
     const bonzi =
         player.element.querySelector(
             ".bonziCharacter"
         );
 
-
     if (bonzi) {
 
         const hue =
             colorToHue(color);
-
 
         bonzi.style.setProperty(
             "--bonzi-hue",
@@ -324,10 +179,7 @@ function updatePlayerColor(
         );
     }
 
-
-    if (
-        player.character === "square"
-    ) {
+    if (player.character === "square") {
 
         player.element.style.backgroundColor =
             color;
@@ -346,42 +198,32 @@ function createPlayer(data) {
     /*
     Don't create duplicates.
     */
-
-    if (
-        players[data.id]
-    ) {
-
+    if (players[data.id]) {
         return players[data.id];
     }
-
 
     const element =
         document.createElement("div");
 
-
     element.className =
         "player";
-
 
     element.dataset.id =
         data.id;
 
 
     /*
-    NAME
+    PLAYER NAME
     */
 
     const nameLabel =
         document.createElement("div");
 
-
     nameLabel.className =
         "playerName";
 
-
     nameLabel.textContent =
         data.name;
-
 
     element.appendChild(
         nameLabel
@@ -431,7 +273,9 @@ function createPlayer(data) {
 
 
     /*
-    CHARACTER
+    ========================================================
+    CREATE CHARACTER
+    ========================================================
     */
 
     if (
@@ -442,22 +286,17 @@ function createPlayer(data) {
             "bonziPlayer"
         );
 
-
         const image =
             document.createElement("img");
-
 
         image.src =
             "/bonzi.png";
 
-
         image.className =
             "bonziCharacter";
 
-
         image.draggable =
             false;
-
 
         element.appendChild(
             image
@@ -469,16 +308,26 @@ function createPlayer(data) {
             "squareCharacter"
         );
 
-
         element.style.backgroundColor =
             player.color;
     }
 
 
+    /*
+    ========================================================
+    IMPORTANT:
+    PUT PLAYER INTO WORLD IMMEDIATELY
+    ========================================================
+    */
+
     world.appendChild(
         element
     );
 
+
+    /*
+    SAVE PLAYER
+    */
 
     players[data.id] =
         player;
@@ -495,12 +344,28 @@ function createPlayer(data) {
 
 
     /*
-    DRAGGING
+    ========================================================
+    EVERY PLAYER CAN BE DRAGGED
+    ========================================================
     */
 
     setupDragging(
         player
     );
+
+
+    /*
+    YOUR PLAYER CLASS
+    */
+
+    if (
+        data.id === myId
+    ) {
+
+        element.classList.add(
+            "myPlayer"
+        );
+    }
 
 
     return player;
@@ -522,34 +387,21 @@ function updatePlayerCharacter(
         character;
 
 
-    /*
-    Remove old Bonzi image.
-    */
-
     const oldBonzi =
         player.element.querySelector(
             ".bonziCharacter"
         );
-
 
     if (oldBonzi) {
         oldBonzi.remove();
     }
 
 
-    /*
-    Remove character classes.
-    */
-
     player.element.classList.remove(
         "bonziPlayer",
         "squareCharacter"
     );
 
-
-    /*
-    Clear square background.
-    */
 
     player.element.style.backgroundColor =
         "";
@@ -567,33 +419,26 @@ function updatePlayerCharacter(
             "bonziPlayer"
         );
 
-
         const image =
             document.createElement("img");
-
 
         image.src =
             "/bonzi.png";
 
-
         image.className =
             "bonziCharacter";
 
-
         image.draggable =
             false;
-
 
         player.element.appendChild(
             image
         );
 
-
         updatePlayerColor(
             player,
             player.color
         );
-
 
         return;
     }
@@ -611,7 +456,6 @@ function updatePlayerCharacter(
             "squareCharacter"
         );
 
-
         player.element.style.backgroundColor =
             player.color;
     }
@@ -626,23 +470,26 @@ DRAGGING
 
 function setupDragging(player) {
 
-    let dragging =
-        false;
+    let dragging = false;
+
+    player.element.style.cursor =
+        "grab";
+
+    player.element.style.touchAction =
+        "none";
+
+    player.element.style.userSelect =
+        "none";
 
 
     player.element.addEventListener(
         "pointerdown",
         (event) => {
 
-            dragging =
-                true;
-
-            currentlyDraggingPlayer =
-                player;
+            dragging = true;
 
             player.element.style.cursor =
                 "grabbing";
-
 
             try {
 
@@ -651,9 +498,10 @@ function setupDragging(player) {
                 );
 
             } catch (error) {
-                // Ignore.
+                console.log(
+                    "Pointer capture unavailable."
+                );
             }
-
 
             event.preventDefault();
             event.stopPropagation();
@@ -668,7 +516,6 @@ function setupDragging(player) {
             if (!dragging) {
                 return;
             }
-
 
             const rect =
                 world.getBoundingClientRect();
@@ -714,11 +561,8 @@ function setupDragging(player) {
                 );
 
 
-            player.x =
-                x;
-
-            player.y =
-                y;
+            player.x = x;
+            player.y = y;
 
 
             player.element.style.left =
@@ -728,11 +572,17 @@ function setupDragging(player) {
                 `${y}%`;
 
 
+            /*
+            Tell server which PLAYER
+            is being moved.
+            */
+
             socket.emit(
                 "move",
                 {
-                    id: 
+                    playerId:
                         player.id,
+
                     x:
                         x,
 
@@ -753,23 +603,10 @@ function setupDragging(player) {
             return;
         }
 
-
-        dragging =
-            false;
-
+        dragging = false;
 
         player.element.style.cursor =
             "grab";
-
-
-        if (
-            currentlyDraggingPlayer === player
-        ) {
-    
-            currentlyDraggingPlayer =
-                null;
-        }
-
 
         try {
 
@@ -778,7 +615,7 @@ function setupDragging(player) {
             );
 
         } catch (error) {
-            // Ignore.
+            // Already released.
         }
     }
 
@@ -799,8 +636,7 @@ function setupDragging(player) {
         "lostpointercapture",
         () => {
 
-            dragging =
-                false;
+            dragging = false;
 
             player.element.style.cursor =
                 "grab";
@@ -820,7 +656,6 @@ function joinRoom() {
     let name =
         nameInput.value.trim();
 
-
     let room =
         roomInput.value.trim();
 
@@ -829,7 +664,6 @@ function joinRoom() {
         name = "Anonymous";
     }
 
-
     if (!room) {
         room = "default";
     }
@@ -837,7 +671,6 @@ function joinRoom() {
 
     myName =
         name;
-
 
     currentRoom =
         room;
@@ -869,7 +702,6 @@ nameInput.addEventListener(
         if (
             event.key === "Enter"
         ) {
-
             joinRoom();
         }
     }
@@ -883,7 +715,6 @@ roomInput.addEventListener(
         if (
             event.key === "Enter"
         ) {
-
             joinRoom();
         }
     }
@@ -903,14 +734,11 @@ socket.on(
         myId =
             data.id;
 
-
         loginScreen.style.display =
             "none";
 
-
         desktop.style.display =
             "block";
-
 
         createPlayer(
             data
@@ -928,6 +756,10 @@ PLAYER JOINED
 socket.on(
     "playerJoined",
     (data) => {
+
+        /*
+        Create them immediately.
+        */
 
         createPlayer(
             data
@@ -949,32 +781,15 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
-
-
-        /*
-        Ignore the server echo for the character
-        we are currently dragging.
-
-        It already moved locally.
-        */
-
-        if (
-            player === currentlyDraggingPlayer
-        ) {
-            return;
-        }
-
 
         player.x =
             data.x;
 
         player.y =
             data.y;
-
 
         player.element.style.left =
             `${data.x}%`;
@@ -998,11 +813,9 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
-
 
         updatePlayerColor(
             player,
@@ -1025,11 +838,9 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
-
 
         updatePlayerCharacter(
             player,
@@ -1052,14 +863,11 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
 
-
         player.element.remove();
-
 
         delete players[data.id];
     }
@@ -1079,11 +887,9 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
-
 
         showSpeechBubble(
             player,
@@ -1127,7 +933,6 @@ function showSpeechBubble(
             ".speechBubble"
         );
 
-
     if (oldBubble) {
         oldBubble.remove();
     }
@@ -1136,14 +941,11 @@ function showSpeechBubble(
     const bubble =
         document.createElement("div");
 
-
     bubble.className =
         "speechBubble";
 
-
     bubble.textContent =
         text;
-
 
     player.element.appendChild(
         bubble
@@ -1184,15 +986,9 @@ function showSpeechBubble(
                 text
             );
 
-
-        utterance.rate =
-            1;
-
-        utterance.pitch =
-            1;
-
-        utterance.volume =
-            1;
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.volume = 1;
 
 
         utterance.onend =
@@ -1201,7 +997,6 @@ function showSpeechBubble(
                 if (
                     bubble.parentNode
                 ) {
-
                     bubble.remove();
                 }
             };
@@ -1213,7 +1008,6 @@ function showSpeechBubble(
                 if (
                     bubble.parentNode
                 ) {
-
                     bubble.remove();
                 }
             };
@@ -1221,11 +1015,9 @@ function showSpeechBubble(
 
         window.speechSynthesis.cancel();
 
-
         window.speechSynthesis.speak(
             utterance
         );
-
 
         return;
     }
@@ -1265,11 +1057,8 @@ function showSpeechBubble(
                 "audio"
             );
 
-
         if (audioContainer) {
-
-            audioContainer.innerHTML =
-                "";
+            audioContainer.innerHTML = "";
         }
 
 
@@ -1284,8 +1073,7 @@ function showSpeechBubble(
         );
 
 
-        let attempts =
-            0;
+        let attempts = 0;
 
 
         const waitForAudio =
@@ -1315,14 +1103,11 @@ function showSpeechBubble(
                                 if (
                                     bubble.parentNode
                                 ) {
-
                                     bubble.remove();
                                 }
 
                             },
-                            {
-                                once: true
-                            }
+                            { once: true }
                         );
 
 
@@ -1333,16 +1118,12 @@ function showSpeechBubble(
                                 if (
                                     bubble.parentNode
                                 ) {
-
                                     bubble.remove();
                                 }
 
                             },
-                            {
-                                once: true
-                            }
+                            { once: true }
                         );
-
 
                         return;
                     }
@@ -1356,11 +1137,9 @@ function showSpeechBubble(
                             waitForAudio
                         );
 
-
                         if (
                             bubble.parentNode
                         ) {
-
                             bubble.remove();
                         }
                     }
@@ -1383,7 +1162,6 @@ function sendMessage() {
     const text =
         messageInput.value.trim();
 
-
     if (!text) {
         return;
     }
@@ -1397,7 +1175,6 @@ function sendMessage() {
 
     messageInput.value =
         "";
-
 
     messageInput.focus();
 }
