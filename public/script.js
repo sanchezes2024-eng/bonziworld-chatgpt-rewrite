@@ -1,3 +1,4 @@
+```javascript
 const socket = io();
 
 /*
@@ -18,12 +19,6 @@ const startButton = document.getElementById("startButton");
 const settingsButton = document.getElementById("settingsButton");
 const settingsPanel = document.getElementById("settingsPanel");
 const closeSettings = document.getElementById("closeSettings");
-const ttsOptions = document.querySelectorAll(
-    'input[name="ttsMode"]'
-);
-
-let ttsMode =
-    localStorage.getItem("ttsMode") || "browser";
 
 const players = {};
 
@@ -31,57 +26,41 @@ let myId = null;
 let myName = "";
 let currentRoom = "default";
 
-
 /*
 ============================================================
-TTS STATE
+ESPEAK AUDIO STATE
 ============================================================
-*/
 
-/*
-Browser TTS:
+IMPORTANT:
 
-Other people's speech is allowed to overlap.
+Every message gets its OWN audio element.
 
-Your own speech is tracked separately so sending
-another message interrupts your previous message.
-*/
+There is NO shared playback queue.
 
-let myBrowserUtterance = null;
+Other people's audio is NEVER stopped.
 
-
-/*
-eSpeak:
-
-Each generated audio gets moved into its own
-independent playback container.
-
-This prevents one player's eSpeak audio from
-deleting another player's audio.
+Only your own previous audio is stopped when
+you send another message.
+============================================================
 */
 
 let myEspeakAudio = null;
 
-let espeakPlaybackContainer =
-    document.getElementById(
-        "espeakPlaybackContainer"
-    );
+const audioGenerator =
+    document.getElementById("audio");
 
-if (!espeakPlaybackContainer) {
+const playbackContainer =
+    document.createElement("div");
 
-    espeakPlaybackContainer =
-        document.createElement("div");
+playbackContainer.id =
+    "espeakPlaybackContainer";
 
-    espeakPlaybackContainer.id =
-        "espeakPlaybackContainer";
+playbackContainer.style.display =
+    "none";
 
-    espeakPlaybackContainer.style.display =
-        "none";
-
-    document.body.appendChild(
-        espeakPlaybackContainer
-    );
-}
+document.body.appendChild(
+    playbackContainer
+);
 
 
 /*
@@ -103,75 +82,40 @@ SETTINGS
 
 if (settingsButton) {
 
-    settingsButton.addEventListener("click", () => {
+    settingsButton.addEventListener(
+        "click",
+        () => {
 
-        if (
-            settingsPanel.style.display === "block"
-        ) {
+            if (
+                settingsPanel.style.display ===
+                "block"
+            ) {
 
-            settingsPanel.style.display =
-                "none";
+                settingsPanel.style.display =
+                    "none";
 
-        } else {
+            } else {
 
-            settingsPanel.style.display =
-                "block";
+                settingsPanel.style.display =
+                    "block";
+            }
         }
-
-    });
+    );
 }
 
 
 if (closeSettings) {
 
-    closeSettings.addEventListener("click", () => {
+    closeSettings.addEventListener(
+        "click",
+        () => {
 
-        settingsPanel.style.display =
-            "none";
+            settingsPanel.style.display =
+                "none";
 
-    });
-
+        }
+    );
 }
-
-
-ttsOptions.forEach((option) => {
-
-    option.checked =
-        option.value === ttsMode;
-
-    option.addEventListener("change", () => {
-
-        if (!option.checked) {
-            return;
-        }
-
-        ttsMode =
-            option.value;
-
-        localStorage.setItem(
-            "ttsMode",
-            ttsMode
-        );
-
-        /*
-        Only stop OUR currently playing speech.
-
-        This does not attempt to cancel other
-        players' independent eSpeak audio.
-        */
-
-        if (
-            ttsMode === "browser" &&
-            window.speechSynthesis
-        ) {
-
-            window.speechSynthesis.cancel();
-
-        }
-
-    });
-
-});
 
 
 /*
@@ -185,6 +129,7 @@ function colorToHue(color) {
     if (!color) {
         return 270;
     }
+
 
     const colors = {
 
@@ -200,8 +145,10 @@ function colorToHue(color) {
 
     };
 
+
     color =
         color.toLowerCase();
+
 
     if (
         colors[color] !== undefined
@@ -209,6 +156,7 @@ function colorToHue(color) {
 
         return colors[color];
     }
+
 
     const hexColors = {
 
@@ -228,12 +176,14 @@ function colorToHue(color) {
 
     };
 
+
     if (
         hexColors[color] !== undefined
     ) {
 
         return hexColors[color];
     }
+
 
     return 270;
 }
@@ -253,15 +203,18 @@ function updatePlayerColor(
     player.color =
         color;
 
+
     const bonzi =
         player.element.querySelector(
             ".bonziCharacter"
         );
 
+
     if (bonzi) {
 
         const hue =
             colorToHue(color);
+
 
         bonzi.style.setProperty(
             "--bonzi-hue",
@@ -269,8 +222,10 @@ function updatePlayerColor(
         );
     }
 
+
     if (
-        player.character === "square"
+        player.character ===
+        "square"
     ) {
 
         player.element.style.backgroundColor =
@@ -298,8 +253,10 @@ function createPlayer(data) {
     const element =
         document.createElement("div");
 
+
     element.className =
         "player";
+
 
     element.dataset.id =
         data.id;
@@ -312,11 +269,14 @@ function createPlayer(data) {
     const nameLabel =
         document.createElement("div");
 
+
     nameLabel.className =
         "playerName";
 
+
     nameLabel.textContent =
         data.name;
+
 
     element.appendChild(
         nameLabel
@@ -329,6 +289,7 @@ function createPlayer(data) {
 
     element.style.left =
         `${data.x}%`;
+
 
     element.style.top =
         `${data.y}%`;
@@ -366,30 +327,34 @@ function createPlayer(data) {
 
 
     /*
-    ========================================================
     CHARACTER
-    ========================================================
     */
 
     if (
-        player.character === "bonzi"
+        player.character ===
+        "bonzi"
     ) {
 
         element.classList.add(
             "bonziPlayer"
         );
 
+
         const image =
             document.createElement("img");
+
 
         image.src =
             "/bonzi.png";
 
+
         image.className =
             "bonziCharacter";
 
+
         image.draggable =
             false;
+
 
         element.appendChild(
             image
@@ -401,13 +366,14 @@ function createPlayer(data) {
             "squareCharacter"
         );
 
+
         element.style.backgroundColor =
             player.color;
     }
 
 
     /*
-    PUT PLAYER INTO WORLD
+    ADD TO WORLD IMMEDIATELY
     */
 
     world.appendChild(
@@ -416,7 +382,7 @@ function createPlayer(data) {
 
 
     /*
-    SAVE PLAYER
+    SAVE
     */
 
     players[data.id] =
@@ -424,7 +390,7 @@ function createPlayer(data) {
 
 
     /*
-    APPLY COLOR
+    COLOR
     */
 
     updatePlayerColor(
@@ -443,7 +409,7 @@ function createPlayer(data) {
 
 
     /*
-    YOUR PLAYER
+    OUR PLAYER
     */
 
     if (
@@ -480,6 +446,7 @@ function updatePlayerCharacter(
             ".bonziCharacter"
         );
 
+
     if (oldBonzi) {
         oldBonzi.remove();
     }
@@ -495,54 +462,56 @@ function updatePlayerCharacter(
         "";
 
 
-    /*
-    BONZI
-    */
-
     if (
-        character === "bonzi"
+        character ===
+        "bonzi"
     ) {
 
         player.element.classList.add(
             "bonziPlayer"
         );
 
+
         const image =
             document.createElement("img");
+
 
         image.src =
             "/bonzi.png";
 
+
         image.className =
             "bonziCharacter";
+
 
         image.draggable =
             false;
 
+
         player.element.appendChild(
             image
         );
+
 
         updatePlayerColor(
             player,
             player.color
         );
 
+
         return;
     }
 
 
-    /*
-    SQUARE
-    */
-
     if (
-        character === "square"
+        character ===
+        "square"
     ) {
 
         player.element.classList.add(
             "squareCharacter"
         );
+
 
         player.element.style.backgroundColor =
             player.color;
@@ -560,11 +529,14 @@ function setupDragging(player) {
 
     let dragging = false;
 
+
     player.element.style.cursor =
         "grab";
 
+
     player.element.style.touchAction =
         "none";
+
 
     player.element.style.userSelect =
         "none";
@@ -575,7 +547,7 @@ function setupDragging(player) {
         (event) => {
 
             /*
-            Only YOUR player can be moved.
+            Only YOUR player can move.
             */
 
             if (
@@ -588,8 +560,10 @@ function setupDragging(player) {
 
             dragging = true;
 
+
             player.element.style.cursor =
                 "grabbing";
+
 
             try {
 
@@ -603,6 +577,7 @@ function setupDragging(player) {
                     "Pointer capture unavailable."
                 );
             }
+
 
             event.preventDefault();
             event.stopPropagation();
@@ -666,6 +641,7 @@ function setupDragging(player) {
             player.x =
                 x;
 
+
             player.y =
                 y;
 
@@ -673,14 +649,10 @@ function setupDragging(player) {
             player.element.style.left =
                 `${x}%`;
 
+
             player.element.style.top =
                 `${y}%`;
 
-
-            /*
-            Only send our own movement.
-
-            */
 
             socket.emit(
                 "move",
@@ -705,10 +677,13 @@ function setupDragging(player) {
             return;
         }
 
+
         dragging = false;
+
 
         player.element.style.cursor =
             "grab";
+
 
         try {
 
@@ -758,6 +733,7 @@ function joinRoom() {
     let name =
         nameInput.value.trim();
 
+
     let room =
         roomInput.value.trim();
 
@@ -766,6 +742,7 @@ function joinRoom() {
         name = "Anonymous";
     }
 
+
     if (!room) {
         room = "default";
     }
@@ -773,6 +750,7 @@ function joinRoom() {
 
     myName =
         name;
+
 
     currentRoom =
         room;
@@ -838,11 +816,14 @@ socket.on(
         myId =
             data.id;
 
+
         loginScreen.style.display =
             "none";
 
+
         desktop.style.display =
             "block";
+
 
         createPlayer(
             data
@@ -881,6 +862,7 @@ socket.on(
         const player =
             players[data.id];
 
+
         if (!player) {
             return;
         }
@@ -889,12 +871,14 @@ socket.on(
         player.x =
             data.x;
 
+
         player.y =
             data.y;
 
 
         player.element.style.left =
             `${data.x}%`;
+
 
         player.element.style.top =
             `${data.y}%`;
@@ -904,7 +888,7 @@ socket.on(
 
 /*
 ============================================================
-PLAYER COLOR CHANGED
+PLAYER COLOR
 ============================================================
 */
 
@@ -914,6 +898,7 @@ socket.on(
 
         const player =
             players[data.id];
+
 
         if (!player) {
             return;
@@ -930,7 +915,7 @@ socket.on(
 
 /*
 ============================================================
-PLAYER CHARACTER CHANGED
+PLAYER CHARACTER
 ============================================================
 */
 
@@ -940,6 +925,7 @@ socket.on(
 
         const player =
             players[data.id];
+
 
         if (!player) {
             return;
@@ -967,12 +953,14 @@ socket.on(
         const player =
             players[data.id];
 
+
         if (!player) {
             return;
         }
 
 
         player.element.remove();
+
 
         delete players[data.id];
     }
@@ -991,6 +979,7 @@ socket.on(
 
         const player =
             players[data.id];
+
 
         if (!player) {
             return;
@@ -1039,6 +1028,7 @@ function showSpeechBubble(
             ".speechBubble"
         );
 
+
     if (oldBubble) {
         oldBubble.remove();
     }
@@ -1047,11 +1037,14 @@ function showSpeechBubble(
     const bubble =
         document.createElement("div");
 
+
     bubble.className =
         "speechBubble";
 
+
     bubble.textContent =
         text;
+
 
     player.element.appendChild(
         bubble
@@ -1060,73 +1053,15 @@ function showSpeechBubble(
 
     /*
     ========================================================
-    BROWSER TTS
+    eSPEAK ONLY
     ========================================================
     */
 
     if (
-        ttsMode === "browser"
+        typeof speak !== "function"
     ) {
 
-        if (
-            !window.speechSynthesis
-        ) {
-
-            setTimeout(
-                () => {
-
-                    if (
-                        bubble.parentNode
-                    ) {
-
-                        bubble.remove();
-                    }
-
-                },
-                5000
-            );
-
-            return;
-        }
-
-
-        const utterance =
-            new SpeechSynthesisUtterance(
-                text
-            );
-
-        utterance.rate =
-            1;
-
-        utterance.pitch =
-            1;
-
-        utterance.volume =
-            1;
-
-
-        /*
-        IMPORTANT:
-
-        Only cancel speech if this is OUR
-        message.
-
-        Other players' browser TTS is allowed
-        to continue.
-        */
-
-        if (
-            player.id === myId
-        ) {
-
-            window.speechSynthesis.cancel();
-
-            myBrowserUtterance =
-                utterance;
-        }
-
-
-        utterance.onend =
+        setTimeout(
             () => {
 
                 if (
@@ -1136,18 +1071,17 @@ function showSpeechBubble(
                     bubble.remove();
                 }
 
-                if (
-                    player.id === myId &&
-                    myBrowserUtterance === utterance
-                ) {
+            },
+            5000
+        );
 
-                    myBrowserUtterance =
-                        null;
-                }
-            };
+        return;
+    }
 
 
-        utterance.onerror =
+    if (!audioGenerator) {
+
+        setTimeout(
             () => {
 
                 if (
@@ -1157,23 +1091,8 @@ function showSpeechBubble(
                     bubble.remove();
                 }
 
-                if (
-                    player.id === myId &&
-                    myBrowserUtterance === utterance
-                ) {
-
-                    myBrowserUtterance =
-                        null;
-                }
-            };
-
-
-        /*
-        Do NOT cancel here for other players.
-        */
-
-        window.speechSynthesis.speak(
-            utterance
+            },
+            5000
         );
 
         return;
@@ -1182,349 +1101,269 @@ function showSpeechBubble(
 
     /*
     ========================================================
-    ESPEAK
+    GENERATE SPEECH
     ========================================================
+
+    #audio is ONLY a temporary generator.
+
+    We clear it BEFORE generating.
+
+    Once the generated audio exists, it is
+    immediately removed from #audio and placed
+    into its own permanent playback container.
     */
 
-    if (
-        ttsMode === "espeak"
-    ) {
+    audioGenerator.innerHTML =
+        "";
 
-        if (
-            typeof speak !== "function"
-        ) {
 
-            setTimeout(
-                () => {
+    speak(
+        text,
+        {
+            amplitude:
+                100,
+
+            pitch:
+                50,
+
+            speed:
+                175,
+
+            voice:
+                "en/en-us"
+        }
+    );
+
+
+    let attempts =
+        0;
+
+
+    const waitForAudio =
+        setInterval(
+            () => {
+
+                attempts++;
+
+
+                const generatedAudio =
+                    audioGenerator.querySelector(
+                        "audio"
+                    );
+
+
+                if (generatedAudio) {
+
+                    clearInterval(
+                        waitForAudio
+                    );
+
+
+                    /*
+                    ====================================================
+                    DETACH FROM GENERATOR
+                    ====================================================
+                    */
+
+                    audioGenerator.removeChild(
+                        generatedAudio
+                    );
+
+
+                    /*
+                    ====================================================
+                    CREATE COMPLETELY INDEPENDENT AUDIO
+                    ====================================================
+                    */
+
+                    const playback =
+                        document.createElement(
+                            "div"
+                        );
+
+
+                    playback.className =
+                        "espeakAudioInstance";
+
+
+                    playback.style.display =
+                        "none";
+
+
+                    playback.appendChild(
+                        generatedAudio
+                    );
+
+
+                    playbackContainer.appendChild(
+                        playback
+                    );
+
+
+                    /*
+                    ====================================================
+                    OWN MESSAGE INTERRUPT
+                    ====================================================
+
+                    If this is YOUR message, stop only
+                    your previous message.
+
+                    If this belongs to somebody else,
+                    DO NOTHING to previous audio.
+                    */
 
                     if (
-                        bubble.parentNode
+                        player.id === myId
                     ) {
-
-                        bubble.remove();
-                    }
-
-                },
-                5000
-            );
-
-            return;
-        }
-
-
-        /*
-        Get the generator container.
-
-        We intentionally clear ONLY the temporary
-        generator audio.
-        */
-
-        const audioContainer =
-            document.getElementById(
-                "audio"
-            );
-
-
-        if (!audioContainer) {
-
-            setTimeout(
-                () => {
-
-                    if (
-                        bubble.parentNode
-                    ) {
-
-                        bubble.remove();
-                    }
-
-                },
-                5000
-            );
-
-            return;
-        }
-
-
-        /*
-        Remove any previous generated audio
-        from the temporary generator container.
-
-        This does NOT touch audio that has already
-        been moved into espeakPlaybackContainer.
-        */
-
-        audioContainer.innerHTML =
-            "";
-
-
-        /*
-        Generate the new speech.
-        */
-
-        speak(
-            text,
-            {
-                amplitude:
-                    100,
-
-                pitch:
-                    50,
-
-                speed:
-                    175,
-
-                voice:
-                    "en/en-us"
-            }
-        );
-
-
-        let attempts =
-            0;
-
-
-        const waitForAudio =
-            setInterval(
-                () => {
-
-                    attempts++;
-
-
-                    const audio =
-                        audioContainer.querySelector(
-                            "audio"
-                        );
-
-
-                    if (audio) {
-
-                        clearInterval(
-                            waitForAudio
-                        );
-
-
-                        /*
-                        ==================================================
-                        IMPORTANT FIX
-                        ==================================================
-
-                        Move this audio OUT of #audio.
-
-                        #audio is reused by speak().
-
-                        If we leave the audio there, the next
-                        eSpeak message can delete it.
-
-                        Each message gets its own independent
-                        audio element.
-                        */
-
-
-                        audioContainer.removeChild(
-                            audio
-                        );
-
-
-                        /*
-                        Create a private playback wrapper.
-                        */
-
-                        const playback =
-                            document.createElement(
-                                "div"
-                            );
-
-                        playback.className =
-                            "espeakAudioInstance";
-
-
-                        playback.style.display =
-                            "none";
-
-
-                        /*
-                        Put this message's audio
-                        into its own wrapper.
-                        */
-
-                        playback.appendChild(
-                            audio
-                        );
-
-
-                        espeakPlaybackContainer.appendChild(
-                            playback
-                        );
-
-
-                        /*
-                        ==================================================
-                        PLAYBACK
-                        ==================================================
-                        */
-
-                        /*
-                        If this is OUR message, stop our
-                        previous eSpeak message.
-
-                        Other players are never stopped.
-                        */
 
                         if (
-                            player.id === myId
+                            myEspeakAudio &&
+                            myEspeakAudio !==
+                                generatedAudio
                         ) {
 
-                            if (
-                                myEspeakAudio &&
-                                myEspeakAudio !== audio
-                            ) {
+                            try {
 
-                                try {
+                                myEspeakAudio.pause();
 
-                                    myEspeakAudio.pause();
+                                myEspeakAudio.currentTime =
+                                    0;
 
-                                    myEspeakAudio.currentTime =
-                                        0;
+                            } catch (error) {
 
-                                } catch (error) {
-                                    // Ignore.
-                                }
+                                console.log(
+                                    "Could not stop previous own TTS:",
+                                    error
+                                );
                             }
-
-
-                            myEspeakAudio =
-                                audio;
                         }
 
 
-                        /*
-                        Audio can now play independently
-                        of every other audio element.
-                        */
-
-                        audio.addEventListener(
-                            "ended",
-                            () => {
-
-                                if (
-                                    bubble.parentNode
-                                ) {
-
-                                    bubble.remove();
-                                }
-
-
-                                playback.remove();
-
-
-                                if (
-                                    player.id === myId &&
-                                    myEspeakAudio === audio
-                                ) {
-
-                                    myEspeakAudio =
-                                        null;
-                                }
-
-                            },
-                            {
-                                once:
-                                    true
-                            }
-                        );
-
-
-                        audio.addEventListener(
-                            "error",
-                            () => {
-
-                                if (
-                                    bubble.parentNode
-                                ) {
-
-                                    bubble.remove();
-                                }
-
-
-                                playback.remove();
-
-
-                                if (
-                                    player.id === myId &&
-                                    myEspeakAudio === audio
-                                ) {
-
-                                    myEspeakAudio =
-                                        null;
-                                }
-
-                            },
-                            {
-                                once:
-                                    true
-                            }
-                        );
-
-
-                        /*
-                        Start this audio.
-
-                        It is independent from all other
-                        players' audio.
-                        */
-
-                        const playPromise =
-                            audio.play();
-
-
-                        if (
-                            playPromise &&
-                            typeof playPromise.catch ===
-                                "function"
-                        ) {
-
-                            playPromise.catch(
-                                (error) => {
-
-                                    console.log(
-                                        "eSpeak playback error:",
-                                        error
-                                    );
-
-                                }
-                            );
-                        }
-
-
-                        return;
+                        myEspeakAudio =
+                            generatedAudio;
                     }
 
 
                     /*
-                    Timeout.
+                    ====================================================
+                    CLEANUP
+                    ====================================================
                     */
 
+                    const cleanup =
+                        () => {
+
+                            if (
+                                bubble.parentNode
+                            ) {
+
+                                bubble.remove();
+                            }
+
+
+                            playback.remove();
+
+
+                            if (
+                                player.id === myId &&
+                                myEspeakAudio ===
+                                    generatedAudio
+                            ) {
+
+                                myEspeakAudio =
+                                    null;
+                            }
+                        };
+
+
+                    generatedAudio.addEventListener(
+                        "ended",
+                        cleanup,
+                        {
+                            once: true
+                        }
+                    );
+
+
+                    generatedAudio.addEventListener(
+                        "error",
+                        cleanup,
+                        {
+                            once: true
+                        }
+                    );
+
+
+                    /*
+                    ====================================================
+                    START PLAYING IMMEDIATELY
+                    ====================================================
+
+                    There is deliberately NO queue and NO
+                    shared audio element.
+
+                    Therefore:
+
+                    Person A ────────▶
+                    Person B ─────▶
+                    Person C ───▶
+
+                    All three can play simultaneously.
+                    */
+
+                    const playPromise =
+                        generatedAudio.play();
+
+
                     if (
-                        attempts >= 200
+                        playPromise &&
+                        typeof playPromise.catch ===
+                            "function"
                     ) {
 
-                        clearInterval(
-                            waitForAudio
+                        playPromise.catch(
+                            (error) => {
+
+                                console.log(
+                                    "eSpeak playback error:",
+                                    error
+                                );
+
+                            }
                         );
-
-
-                        if (
-                            bubble.parentNode
-                        ) {
-
-                            bubble.remove();
-                        }
                     }
 
-                },
-                50
-            );
-    }
+
+                    return;
+                }
+
+
+                /*
+                ====================================================
+                GENERATION TIMEOUT
+                ====================================================
+                */
+
+                if (
+                    attempts >= 200
+                ) {
+
+                    clearInterval(
+                        waitForAudio
+                    );
+
+
+                    if (
+                        bubble.parentNode
+                    ) {
+
+                        bubble.remove();
+                    }
+                }
+
+            },
+            50
+        );
 }
 
 
@@ -1539,6 +1378,7 @@ function sendMessage() {
     const text =
         messageInput.value.trim();
 
+
     if (!text) {
         return;
     }
@@ -1552,6 +1392,7 @@ function sendMessage() {
 
     messageInput.value =
         "";
+
 
     messageInput.focus();
 }
@@ -1586,3 +1427,4 @@ messageInput.addEventListener(
         messageInput.select();
     }
 );
+```
