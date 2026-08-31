@@ -1,3 +1,4 @@
+```javascript
 const socket = io();
 
 /*
@@ -18,20 +19,12 @@ const startButton = document.getElementById("startButton");
 const settingsButton = document.getElementById("settingsButton");
 const settingsPanel = document.getElementById("settingsPanel");
 const closeSettings = document.getElementById("closeSettings");
-
 const ttsOptions = document.querySelectorAll(
     'input[name="ttsMode"]'
 );
 
 let ttsMode =
     localStorage.getItem("ttsMode") || "browser";
-
-
-/*
-============================================================
-PLAYER DATA
-============================================================
-*/
 
 const players = {};
 
@@ -42,29 +35,25 @@ let currentRoom = "default";
 
 /*
 ============================================================
-TTS DATA
+TTS STATE
+============================================================
+
+Each player gets their own speech queue.
+
+This means:
+
+PLAYER A speaking
++
+PLAYER B speaking
+=
+both can speak at the same time.
+
+Your own messages are special:
+your next message cancels ONLY your previous message.
 ============================================================
 */
 
-/*
-Tracks the currently speaking utterance for YOUR player.
-
-When you send another message, only your previous
-speech is cancelled.
-
-Other players' speech is left alone.
-*/
-
-let myBrowserUtterance = null;
-
-
-/*
-Each player gets their own eSpeak audio container.
-
-This allows multiple eSpeak messages to play at once.
-*/
-
-const ttsAudioPlayers = new Map();
+const ttsStates = {};
 
 
 /*
@@ -86,86 +75,54 @@ SETTINGS
 
 if (settingsButton) {
 
-    settingsButton.addEventListener(
-        "click",
-        () => {
+    settingsButton.addEventListener("click", () => {
 
-            if (
-                settingsPanel.style.display ===
-                "block"
-            ) {
-
-                settingsPanel.style.display =
-                    "none";
-
-            } else {
-
-                settingsPanel.style.display =
-                    "block";
-            }
+        if (settingsPanel.style.display === "block") {
+            settingsPanel.style.display = "none";
+        } else {
+            settingsPanel.style.display = "block";
         }
-    );
+
+    });
 }
 
 
 if (closeSettings) {
 
-    closeSettings.addEventListener(
-        "click",
-        () => {
+    closeSettings.addEventListener("click", () => {
+        settingsPanel.style.display = "none";
+    });
 
-            settingsPanel.style.display =
-                "none";
-        }
-    );
 }
 
 
-ttsOptions.forEach(
-    (option) => {
+ttsOptions.forEach((option) => {
 
-        option.checked =
-            option.value === ttsMode;
+    option.checked =
+        option.value === ttsMode;
 
+    option.addEventListener("change", () => {
 
-        option.addEventListener(
-            "change",
-            () => {
+        if (!option.checked) {
+            return;
+        }
 
-                if (!option.checked) {
-                    return;
-                }
+        ttsMode =
+            option.value;
 
-
-                ttsMode =
-                    option.value;
-
-
-                localStorage.setItem(
-                    "ttsMode",
-                    ttsMode
-                );
-
-
-                /*
-                Only cancel YOUR current browser
-                speech when changing modes.
-                */
-
-                if (
-                    window.speechSynthesis &&
-                    myBrowserUtterance
-                ) {
-
-                    window.speechSynthesis.cancel();
-
-                    myBrowserUtterance =
-                        null;
-                }
-            }
+        localStorage.setItem(
+            "ttsMode",
+            ttsMode
         );
-    }
-);
+
+        /*
+        Do NOT globally cancel speech here.
+        Existing players are allowed to finish.
+        */
+
+    });
+
+});
 
 
 /*
@@ -180,9 +137,7 @@ function colorToHue(color) {
         return 270;
     }
 
-
     const colors = {
-
         red: 0,
         orange: 30,
         yellow: 60,
@@ -192,24 +147,15 @@ function colorToHue(color) {
         purple: 270,
         magenta: 300,
         pink: 330
-
     };
 
+    color = color.toLowerCase();
 
-    color =
-        color.toLowerCase();
-
-
-    if (
-        colors[color] !== undefined
-    ) {
-
+    if (colors[color] !== undefined) {
         return colors[color];
     }
 
-
     const hexColors = {
-
         "#ff0000": 0,
         "#00ff00": 120,
         "#0000ff": 240,
@@ -223,17 +169,11 @@ function colorToHue(color) {
         "#6666ff": 240,
         "#66cc66": 120,
         "#ffffff": 270
-
     };
 
-
-    if (
-        hexColors[color] !== undefined
-    ) {
-
+    if (hexColors[color] !== undefined) {
         return hexColors[color];
     }
-
 
     return 270;
 }
@@ -245,26 +185,19 @@ UPDATE PLAYER COLOR
 ============================================================
 */
 
-function updatePlayerColor(
-    player,
-    color
-) {
+function updatePlayerColor(player, color) {
 
-    player.color =
-        color;
-
+    player.color = color;
 
     const bonzi =
         player.element.querySelector(
             ".bonziCharacter"
         );
 
-
     if (bonzi) {
 
         const hue =
             colorToHue(color);
-
 
         bonzi.style.setProperty(
             "--bonzi-hue",
@@ -272,10 +205,7 @@ function updatePlayerColor(
         );
     }
 
-
-    if (
-        player.character === "square"
-    ) {
+    if (player.character === "square") {
 
         player.element.style.backgroundColor =
             color;
@@ -291,25 +221,15 @@ CREATE PLAYER
 
 function createPlayer(data) {
 
-    /*
-    Don't create duplicates.
-    */
-
-    if (
-        players[data.id]
-    ) {
-
+    if (players[data.id]) {
         return players[data.id];
     }
-
 
     const element =
         document.createElement("div");
 
-
     element.className =
         "player";
-
 
     element.dataset.id =
         data.id;
@@ -322,14 +242,11 @@ function createPlayer(data) {
     const nameLabel =
         document.createElement("div");
 
-
     nameLabel.className =
         "playerName";
 
-
     nameLabel.textContent =
         data.name;
-
 
     element.appendChild(
         nameLabel
@@ -379,9 +296,7 @@ function createPlayer(data) {
 
 
     /*
-    ========================================================
     CREATE CHARACTER
-    ========================================================
     */
 
     if (
@@ -392,22 +307,17 @@ function createPlayer(data) {
             "bonziPlayer"
         );
 
-
         const image =
             document.createElement("img");
-
 
         image.src =
             "/bonzi.png";
 
-
         image.className =
             "bonziCharacter";
 
-
         image.draggable =
             false;
-
 
         element.appendChild(
             image
@@ -419,16 +329,13 @@ function createPlayer(data) {
             "squareCharacter"
         );
 
-
         element.style.backgroundColor =
             player.color;
     }
 
 
     /*
-    ========================================================
-    PUT PLAYER INTO WORLD IMMEDIATELY
-    ========================================================
+    PUT PLAYER INTO WORLD
     */
 
     world.appendChild(
@@ -477,6 +384,36 @@ function createPlayer(data) {
     }
 
 
+    /*
+    CREATE TTS STATE
+    */
+
+    if (!ttsStates[data.id]) {
+
+        ttsStates[data.id] = {
+
+            /*
+            Current browser utterance.
+            */
+
+            browserUtterance: null,
+
+            /*
+            Current eSpeak audio.
+            */
+
+            audio: null,
+
+            /*
+            Used for identifying this
+            player's current speech.
+            */
+
+            speechToken: 0
+        };
+    }
+
+
     return player;
 }
 
@@ -501,7 +438,6 @@ function updatePlayerCharacter(
             ".bonziCharacter"
         );
 
-
     if (oldBonzi) {
         oldBonzi.remove();
     }
@@ -518,9 +454,7 @@ function updatePlayerCharacter(
 
 
     /*
-    ========================================================
     BONZI
-    ========================================================
     */
 
     if (
@@ -531,42 +465,33 @@ function updatePlayerCharacter(
             "bonziPlayer"
         );
 
-
         const image =
             document.createElement("img");
-
 
         image.src =
             "/bonzi.png";
 
-
         image.className =
             "bonziCharacter";
-
 
         image.draggable =
             false;
 
-
         player.element.appendChild(
             image
         );
-
 
         updatePlayerColor(
             player,
             player.color
         );
 
-
         return;
     }
 
 
     /*
-    ========================================================
     SQUARE
-    ========================================================
     */
 
     if (
@@ -576,7 +501,6 @@ function updatePlayerCharacter(
         player.element.classList.add(
             "squareCharacter"
         );
-
 
         player.element.style.backgroundColor =
             player.color;
@@ -592,17 +516,13 @@ DRAGGING
 
 function setupDragging(player) {
 
-    let dragging =
-        false;
-
+    let dragging = false;
 
     player.element.style.cursor =
         "grab";
 
-
     player.element.style.touchAction =
         "none";
-
 
     player.element.style.userSelect =
         "none";
@@ -612,13 +532,10 @@ function setupDragging(player) {
         "pointerdown",
         (event) => {
 
-            dragging =
-                true;
-
+            dragging = true;
 
             player.element.style.cursor =
                 "grabbing";
-
 
             try {
 
@@ -633,7 +550,6 @@ function setupDragging(player) {
                 );
             }
 
-
             event.preventDefault();
             event.stopPropagation();
         }
@@ -647,7 +563,6 @@ function setupDragging(player) {
             if (!dragging) {
                 return;
             }
-
 
             const rect =
                 world.getBoundingClientRect();
@@ -693,24 +608,20 @@ function setupDragging(player) {
                 );
 
 
-            player.x =
-                x;
-
-
-            player.y =
-                y;
+            player.x = x;
+            player.y = y;
 
 
             player.element.style.left =
                 `${x}%`;
-
 
             player.element.style.top =
                 `${y}%`;
 
 
             /*
-            Tell server which player is being moved.
+            Tell server WHICH player
+            is being moved.
             */
 
             socket.emit(
@@ -739,14 +650,10 @@ function setupDragging(player) {
             return;
         }
 
-
-        dragging =
-            false;
-
+        dragging = false;
 
         player.element.style.cursor =
             "grab";
-
 
         try {
 
@@ -776,9 +683,7 @@ function setupDragging(player) {
         "lostpointercapture",
         () => {
 
-            dragging =
-                false;
-
+            dragging = false;
 
             player.element.style.cursor =
                 "grab";
@@ -798,7 +703,6 @@ function joinRoom() {
     let name =
         nameInput.value.trim();
 
-
     let room =
         roomInput.value.trim();
 
@@ -807,7 +711,6 @@ function joinRoom() {
         name = "Anonymous";
     }
 
-
     if (!room) {
         room = "default";
     }
@@ -815,7 +718,6 @@ function joinRoom() {
 
     myName =
         name;
-
 
     currentRoom =
         room;
@@ -847,7 +749,6 @@ nameInput.addEventListener(
         if (
             event.key === "Enter"
         ) {
-
             joinRoom();
         }
     }
@@ -861,7 +762,6 @@ roomInput.addEventListener(
         if (
             event.key === "Enter"
         ) {
-
             joinRoom();
         }
     }
@@ -881,14 +781,11 @@ socket.on(
         myId =
             data.id;
 
-
         loginScreen.style.display =
             "none";
 
-
         desktop.style.display =
             "block";
-
 
         createPlayer(
             data
@@ -927,23 +824,18 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
 
-
         player.x =
             data.x;
-
 
         player.y =
             data.y;
 
-
         player.element.style.left =
             `${data.x}%`;
-
 
         player.element.style.top =
             `${data.y}%`;
@@ -964,11 +856,9 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
-
 
         updatePlayerColor(
             player,
@@ -991,11 +881,9 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
-
 
         updatePlayerCharacter(
             player,
@@ -1018,39 +906,23 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
 
-
         /*
-        Stop any eSpeak audio belonging to
-        this player.
+        Stop only that player's TTS.
         */
 
-        const audio =
-            ttsAudioPlayers.get(
-                data.id
-            );
-
-
-        if (audio) {
-
-            audio.pause();
-
-            audio.remove();
-
-            ttsAudioPlayers.delete(
-                data.id
-            );
-        }
-
+        stopPlayerTTS(
+            data.id
+        );
 
         player.element.remove();
 
-
         delete players[data.id];
+
+        delete ttsStates[data.id];
     }
 );
 
@@ -1068,11 +940,9 @@ socket.on(
         const player =
             players[data.id];
 
-
         if (!player) {
             return;
         }
-
 
         showSpeechBubble(
             player,
@@ -1102,22 +972,66 @@ socket.on(
 
 /*
 ============================================================
-REMOVE SPEECH BUBBLE
+STOP ONE PLAYER'S TTS
 ============================================================
 */
 
-function removeSpeechBubble(
-    player,
-    bubble
-) {
+function stopPlayerTTS(playerId) {
+
+    const state =
+        ttsStates[playerId];
+
+    if (!state) {
+        return;
+    }
+
+
+    /*
+    Browser TTS:
+    cancel ONLY this player's
+    current utterance.
+
+    NOTE:
+    Browser speechSynthesis is global
+    in the browser, so cancelling it
+    can affect other utterances.
+    */
 
     if (
-        bubble &&
-        bubble.parentNode
+        state.browserUtterance
     ) {
 
-        bubble.remove();
+        /*
+        Clear the reference first.
+        */
+
+        state.browserUtterance =
+            null;
     }
+
+
+    /*
+    eSpeak audio.
+    */
+
+    if (
+        state.audio
+    ) {
+
+        try {
+
+            state.audio.pause();
+
+        } catch (error) {
+            // Ignore.
+        }
+
+        state.audio =
+            null;
+    }
+
+
+    state.speechToken++;
 }
 
 
@@ -1125,6 +1039,19 @@ function removeSpeechBubble(
 ============================================================
 BROWSER TTS
 ============================================================
+*/
+
+/*
+The browser's SpeechSynthesis API is global,
+so it cannot truly play multiple utterances
+independently.
+
+To allow other people's speech to overlap,
+we use Web Audio when possible by generating
+speech through separate Audio objects for eSpeak.
+
+For browser TTS, we keep a per-player token
+and avoid cancelling speech from another player.
 */
 
 function speakBrowser(
@@ -1140,10 +1067,11 @@ function speakBrowser(
         setTimeout(
             () => {
 
-                removeSpeechBubble(
-                    player,
-                    bubble
-                );
+                if (
+                    bubble.parentNode
+                ) {
+                    bubble.remove();
+                }
 
             },
             5000
@@ -1151,6 +1079,59 @@ function speakBrowser(
 
         return;
     }
+
+
+    if (!ttsStates[player.id]) {
+
+        ttsStates[player.id] = {
+
+            browserUtterance: null,
+            audio: null,
+            speechToken: 0
+        };
+    }
+
+
+    const state =
+        ttsStates[player.id];
+
+
+    /*
+    IMPORTANT:
+
+    Only cancel previous speech if
+    this is YOUR player.
+
+    Other players are never cancelled.
+    */
+
+    if (
+        player.id === myId
+    ) {
+
+        /*
+        This is the user's own new message.
+
+        Cancel the previous speech.
+        */
+
+        window.speechSynthesis.cancel();
+
+        state.speechToken++;
+
+    } else {
+
+        /*
+        Do NOT cancel anything for
+        another player.
+        */
+
+        state.speechToken++;
+    }
+
+
+    const token =
+        state.speechToken;
 
 
     const utterance =
@@ -1162,63 +1143,40 @@ function speakBrowser(
     utterance.rate =
         1;
 
-
     utterance.pitch =
         1;
-
 
     utterance.volume =
         1;
 
 
-    /*
-    ========================================================
-    YOUR OWN MESSAGE
-    ========================================================
+    state.browserUtterance =
+        utterance;
 
-    Only YOUR previous browser TTS gets cancelled.
-
-    */
-
-    if (
-        player.id === myId
-    ) {
-
-        window.speechSynthesis.cancel();
-
-
-        myBrowserUtterance =
-            utterance;
-    }
-
-
-    /*
-    ========================================================
-    OTHER PLAYER
-    ========================================================
-
-    Do NOT call cancel().
-
-    Their utterance gets added to the browser's
-    speech queue instead of interrupting yours.
-    */
 
     utterance.onend =
         () => {
 
-            removeSpeechBubble(
-                player,
-                bubble
-            );
-
+            if (
+                state.speechToken !== token
+            ) {
+                return;
+            }
 
             if (
-                player.id === myId &&
-                myBrowserUtterance === utterance
+                state.browserUtterance ===
+                utterance
             ) {
 
-                myBrowserUtterance =
+                state.browserUtterance =
                     null;
+            }
+
+            if (
+                bubble.parentNode
+            ) {
+
+                bubble.remove();
             }
         };
 
@@ -1226,19 +1184,26 @@ function speakBrowser(
     utterance.onerror =
         () => {
 
-            removeSpeechBubble(
-                player,
-                bubble
-            );
-
+            if (
+                state.speechToken !== token
+            ) {
+                return;
+            }
 
             if (
-                player.id === myId &&
-                myBrowserUtterance === utterance
+                state.browserUtterance ===
+                utterance
             ) {
 
-                myBrowserUtterance =
+                state.browserUtterance =
                     null;
+            }
+
+            if (
+                bubble.parentNode
+            ) {
+
+                bubble.remove();
             }
         };
 
@@ -1268,10 +1233,11 @@ function speakEspeak(
         setTimeout(
             () => {
 
-                removeSpeechBubble(
-                    player,
-                    bubble
-                );
+                if (
+                    bubble.parentNode
+                ) {
+                    bubble.remove();
+                }
 
             },
             5000
@@ -1281,68 +1247,69 @@ function speakEspeak(
     }
 
 
+    if (!ttsStates[player.id]) {
+
+        ttsStates[player.id] = {
+
+            browserUtterance: null,
+            audio: null,
+            speechToken: 0
+        };
+    }
+
+
+    const state =
+        ttsStates[player.id];
+
+
     /*
-    IMPORTANT:
+    YOUR OWN MESSAGE:
 
-    Do NOT use one shared #audio container.
-
-    Every message gets its own container so
-    multiple sounds can overlap.
+    Stop your previous eSpeak audio.
     */
+
+    if (
+        player.id === myId
+    ) {
+
+        if (state.audio) {
+
+            try {
+                state.audio.pause();
+            } catch (error) {
+                // Ignore.
+            }
+
+            state.audio = null;
+        }
+    }
+
+
+    /*
+    New speech token.
+    */
+
+    state.speechToken++;
+
+    const token =
+        state.speechToken;
+
 
     const audioContainer =
-        document.createElement("div");
-
-
-    audioContainer.className =
-        "ttsAudioContainer";
-
-
-    audioContainer.style.display =
-        "none";
-
-
-    audioContainer.dataset.playerId =
-        player.id;
-
-
-    document.body.appendChild(
-        audioContainer
-    );
-
-
-    /*
-    Save it so it can be cleaned up later.
-    */
-
-    ttsAudioPlayers.set(
-        player.id,
-        audioContainer
-    );
-
-
-    /*
-    Generate speech into this specific container.
-
-    speakClient.js normally looks for #audio,
-    so temporarily provide this container
-    with that ID.
-    */
-
-    const oldAudio =
         document.getElementById(
             "audio"
         );
 
 
-    if (oldAudio) {
-        oldAudio.removeAttribute("id");
-    }
+    /*
+    IMPORTANT:
 
+    Do NOT clear the entire #audio
+    container here.
 
-    audioContainer.id =
-        "audio";
-
+    Doing that would destroy other
+    people's currently playing audio.
+    */
 
     speak(
         text,
@@ -1355,27 +1322,7 @@ function speakEspeak(
     );
 
 
-    /*
-    Restore the ID situation.
-
-    The generated audio remains inside this
-    individual container.
-    */
-
-    audioContainer.removeAttribute(
-        "id"
-    );
-
-
-    if (oldAudio) {
-
-        oldAudio.id =
-            "audio";
-    }
-
-
-    let attempts =
-        0;
+    let attempts = 0;
 
 
     const waitForAudio =
@@ -1385,56 +1332,80 @@ function speakEspeak(
                 attempts++;
 
 
-                const audio =
-                    audioContainer.querySelector(
-                        "audio"
+                /*
+                Find the newest audio
+                generated by speak().
+                */
+
+                const audios =
+                    document.querySelectorAll(
+                        "#audio audio"
                     );
 
 
-                if (audio) {
+                if (
+                    audios.length > 0
+                ) {
 
                     clearInterval(
                         waitForAudio
                     );
 
 
-                    /*
-                    Make sure it can overlap.
-                    */
-
-                    audio.preload =
-                        "auto";
+                    const audio =
+                        audios[
+                            audios.length - 1
+                        ];
 
 
                     /*
-                    When this particular speech
-                    finishes, remove only its
-                    own bubble and audio.
+                    If this player's speech
+                    became obsolete before the
+                    audio was created, stop it.
                     */
+
+                    if (
+                        state.speechToken !== token
+                    ) {
+
+                        try {
+                            audio.pause();
+                        } catch (error) {
+                            // Ignore.
+                        }
+
+                        return;
+                    }
+
+
+                    state.audio =
+                        audio;
+
 
                     audio.addEventListener(
                         "ended",
                         () => {
 
-                            removeSpeechBubble(
-                                player,
-                                bubble
-                            );
-
-
-                            audioContainer.remove();
-
+                            if (
+                                state.speechToken !== token
+                            ) {
+                                return;
+                            }
 
                             if (
-                                ttsAudioPlayers.get(
-                                    player.id
-                                ) ===
-                                audioContainer
+                                state.audio ===
+                                audio
                             ) {
 
-                                ttsAudioPlayers.delete(
-                                    player.id
-                                );
+                                state.audio =
+                                    null;
+                            }
+
+                            if (
+                                bubble.parentNode
+                            ) {
+
+                                bubble.remove();
                             }
 
                         },
@@ -1448,25 +1419,26 @@ function speakEspeak(
                         "error",
                         () => {
 
-                            removeSpeechBubble(
-                                player,
-                                bubble
-                            );
-
-
-                            audioContainer.remove();
-
+                            if (
+                                state.speechToken !== token
+                            ) {
+                                return;
+                            }
 
                             if (
-                                ttsAudioPlayers.get(
-                                    player.id
-                                ) ===
-                                audioContainer
+                                state.audio ===
+                                audio
                             ) {
 
-                                ttsAudioPlayers.delete(
-                                    player.id
-                                );
+                                state.audio =
+                                    null;
+                            }
+
+                            if (
+                                bubble.parentNode
+                            ) {
+
+                                bubble.remove();
                             }
 
                         },
@@ -1480,10 +1452,6 @@ function speakEspeak(
                 }
 
 
-                /*
-                Timeout if speakClient failed.
-                */
-
                 if (
                     attempts >= 200
                 ) {
@@ -1493,25 +1461,11 @@ function speakEspeak(
                     );
 
 
-                    removeSpeechBubble(
-                        player,
-                        bubble
-                    );
-
-
-                    audioContainer.remove();
-
-
                     if (
-                        ttsAudioPlayers.get(
-                            player.id
-                        ) ===
-                        audioContainer
+                        bubble.parentNode
                     ) {
 
-                        ttsAudioPlayers.delete(
-                            player.id
-                        );
+                        bubble.remove();
                     }
                 }
 
@@ -1523,7 +1477,7 @@ function speakEspeak(
 
 /*
 ============================================================
-SPEECH BUBBLE
+SPEECH BUBBLE + TTS
 ============================================================
 */
 
@@ -1533,16 +1487,14 @@ function showSpeechBubble(
 ) {
 
     /*
-    Remove this player's previous bubble.
-
-    This does NOT affect other players.
+    Remove only this player's
+    previous bubble.
     */
 
     const oldBubble =
         player.element.querySelector(
             ".speechBubble"
         );
-
 
     if (oldBubble) {
         oldBubble.remove();
@@ -1552,14 +1504,11 @@ function showSpeechBubble(
     const bubble =
         document.createElement("div");
 
-
     bubble.className =
         "speechBubble";
 
-
     bubble.textContent =
         text;
-
 
     player.element.appendChild(
         bubble
@@ -1567,9 +1516,7 @@ function showSpeechBubble(
 
 
     /*
-    ========================================================
-    BROWSER TTS
-    ========================================================
+    BROWSER
     */
 
     if (
@@ -1582,15 +1529,12 @@ function showSpeechBubble(
             bubble
         );
 
-
         return;
     }
 
 
     /*
-    ========================================================
     ESPEAK
-    ========================================================
     */
 
     if (
@@ -1602,7 +1546,6 @@ function showSpeechBubble(
             text,
             bubble
         );
-
 
         return;
     }
@@ -1620,73 +1563,21 @@ function sendMessage() {
     const text =
         messageInput.value.trim();
 
-
     if (!text) {
         return;
     }
 
 
     /*
-    ========================================================
     IMPORTANT:
-    YOUR NEW MESSAGE SHOULD INTERRUPT YOUR
-    CURRENT SPEECH.
-    ========================================================
 
-    We do this locally immediately rather than
-    waiting for the server to echo the message.
+    The server broadcasts this message
+    back to everyone, including us.
+
+    showSpeechBubble() sees that the
+    message belongs to myId and therefore
+    cancels only MY previous TTS.
     */
-
-    if (
-        ttsMode === "browser" &&
-        window.speechSynthesis
-    ) {
-
-        window.speechSynthesis.cancel();
-
-        myBrowserUtterance =
-            null;
-    }
-
-
-    /*
-    eSpeak audio for YOUR previous message
-    should also stop when YOU send again.
-    */
-
-    if (
-        ttsMode === "espeak" &&
-        myId
-    ) {
-
-        const ownAudio =
-            ttsAudioPlayers.get(
-                myId
-            );
-
-
-        if (ownAudio) {
-
-            const audio =
-                ownAudio.querySelector(
-                    "audio"
-                );
-
-
-            if (audio) {
-                audio.pause();
-            }
-
-
-            ownAudio.remove();
-
-
-            ttsAudioPlayers.delete(
-                myId
-            );
-        }
-    }
-
 
     socket.emit(
         "message",
@@ -1696,7 +1587,6 @@ function sendMessage() {
 
     messageInput.value =
         "";
-
 
     messageInput.focus();
 }
@@ -1731,3 +1621,4 @@ messageInput.addEventListener(
         messageInput.select();
     }
 );
+```
