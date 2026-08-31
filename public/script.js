@@ -1,4 +1,4 @@
-```javascript
+
 const socket = io();
 
 /*
@@ -1427,4 +1427,4 @@ messageInput.addEventListener(
         messageInput.select();
     }
 );
-```
+
