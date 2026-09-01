@@ -1,590 +1,535 @@
 * {
-  box-sizing: border-box;
-  }
+    box-sizing: border-box;
+}
 
 html,
 body {
-width: 100%;
-height: 100%;
-margin: 0;
-overflow: hidden;
-font-family: Arial, sans-serif;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
 }
 
-# /*
 
-# LOGIN
-
+/*
+============================================================
+LOGIN
+============================================================
 */
 
 #loginScreen {
-position: fixed;
+    position: fixed;
 
-```
-left: 0;
-top: 0;
+    left: 0;
+    top: 0;
 
-width: 100%;
-height: 100%;
+    width: 100%;
+    height: 100%;
 
-display: flex;
+    display: flex;
 
-align-items: center;
-justify-content: center;
+    align-items: center;
+    justify-content: center;
 
-background: #202020;
-```
-
+    background: #202020;
 }
 
 .loginBox {
-width: 320px;
+    width: 320px;
 
-```
-padding: 30px;
+    padding: 30px;
 
-background: #eeeeee;
+    background: #eeeeee;
 
-border: 2px solid #555555;
+    border: 2px solid #555555;
 
-box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.5);
+    box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.5);
 
-display: flex;
+    display: flex;
 
-flex-direction: column;
+    flex-direction: column;
 
-gap: 12px;
-```
-
+    gap: 12px;
 }
 
 .loginBox h1 {
-margin: 0 0 10px 0;
+    margin: 0 0 10px 0;
 
-```
-text-align: center;
-```
-
+    text-align: center;
 }
 
 .loginBox input {
-width: 100%;
+    width: 100%;
 
-```
-height: 42px;
+    height: 42px;
 
-padding: 0 10px;
+    padding: 0 10px;
 
-font-size: 16px;
+    font-size: 16px;
 
-border: 1px solid #888888;
+    border: 1px solid #888888;
 
-outline: none;
-```
-
+    outline: none;
 }
 
 .loginBox input:focus {
-border-color: #444444;
+    border-color: #444444;
 }
 
 .loginBox button {
-width: 100%;
+    width: 100%;
 
-```
-height: 42px;
+    height: 42px;
 
-background: #c0c0c0;
+    background: #c0c0c0;
 
-border: 2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
-font-size: 16px;
+    font-size: 16px;
 
-cursor: pointer;
-```
-
+    cursor: pointer;
 }
 
 .loginBox button:active {
-border-style: inset;
+    border-style: inset;
 }
 
-# /*
 
-# DESKTOP
-
+/*
+============================================================
+DESKTOP
+============================================================
 */
 
 #desktop {
-position: fixed;
+    position: fixed;
 
-```
-left: 0;
-top: 0;
+    left: 0;
+    top: 0;
 
-width: 100%;
-height: 100%;
+    width: 100%;
+    height: 100%;
 
-display: none;
+    display: none;
 
-background-image: url("/background.png");
+    background-image: url("/background.png");
 
-background-size: cover;
+    background-size: cover;
 
-background-position: center;
+    background-position: center;
 
-background-repeat: no-repeat;
-```
-
+    background-repeat: no-repeat;
 }
 
-# /*
 
-# WORLD
-
+/*
+============================================================
+WORLD
+============================================================
 */
 
 #world {
-position: absolute;
+    position: absolute;
 
-```
-left: 0;
-top: 0;
+    left: 0;
+    top: 0;
 
-width: 100%;
-height: calc(100% - 50px);
+    width: 100%;
+    height: calc(100% - 50px);
 
-overflow: hidden;
+    overflow: hidden;
 
-touch-action: none;
+    touch-action: none;
 
-user-select: none;
+    user-select: none;
 
--webkit-user-select: none;
-```
-
+    -webkit-user-select: none;
 }
 
-# /*
 
-# PLAYERS
-
+/*
+============================================================
+PLAYERS
+============================================================
 */
 
 .player {
-position: absolute;
+    position: absolute;
 
-```
-width: 50px;
-height: 50px;
+    width: 50px;
+    height: 50px;
 
-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
 
-user-select: none;
+    user-select: none;
 
--webkit-user-select: none;
+    -webkit-user-select: none;
 
-touch-action: none;
+    touch-action: none;
 
-cursor: grab;
+    cursor: grab;
 
-pointer-events: auto;
+    pointer-events: auto;
 
-z-index: 5;
-```
-
+    z-index: 5;
 }
 
 .player:active {
-cursor: grabbing;
+    cursor: grabbing;
 }
 
-# /*
 
-# SQUARE
-
+/*
+============================================================
+SQUARE
+============================================================
 */
 
 .player.squareCharacter {
-width: 50px;
-height: 50px;
+    width: 50px;
+    height: 50px;
 
-```
-background: purple;
+    background: purple;
 
-border: 2px solid #300030;
-```
-
+    border: 2px solid #300030;
 }
 
-# /*
 
-# BONZI
-
+/*
+============================================================
+BONZI
+============================================================
 */
 
 .player.bonziPlayer {
-width: 105px;
-height: 105px;
+    width: 105px;
+    height: 105px;
 
-```
-background: transparent;
+    background: transparent;
 
-border: none;
-```
-
+    border: none;
 }
 
 .bonziCharacter {
-display: block;
+    display: block;
 
-```
-width: 100%;
-height: 100%;
+    width: 100%;
+    height: 100%;
 
-object-fit: contain;
+    object-fit: contain;
 
-pointer-events: none;
+    pointer-events: none;
 
-user-select: none;
+    user-select: none;
 
--webkit-user-select: none;
+    -webkit-user-select: none;
 
-filter:
-    hue-rotate(
-        var(--bonzi-hue, 0deg)
-    );
-```
-
+    filter:
+        hue-rotate(
+            var(--bonzi-hue, 0deg)
+        );
 }
 
-# /*
 
-# PLAYER NAME
-
+/*
+============================================================
+PLAYER NAME
+============================================================
 */
 
 .playerName {
-position: absolute;
+    position: absolute;
 
-```
-left: 50%;
+    left: 50%;
 
-bottom: 100%;
+    bottom: 100%;
 
-transform: translateX(-50%);
+    transform: translateX(-50%);
 
-margin-bottom: 5px;
+    margin-bottom: 5px;
 
-color: white;
+    color: white;
 
-font-size: 13px;
+    font-size: 13px;
 
-white-space: nowrap;
+    white-space: nowrap;
 
-text-shadow:
-    1px 1px 2px black;
+    text-shadow:
+        1px 1px 2px black;
 
-pointer-events: none;
+    pointer-events: none;
 
-user-select: none;
+    user-select: none;
 
--webkit-user-select: none;
-```
-
+    -webkit-user-select: none;
 }
 
-# /*
 
-# SPEECH BUBBLE
-
+/*
+============================================================
+SPEECH BUBBLE
+============================================================
 */
 
 .speechBubble {
-position: absolute;
+    position: absolute;
 
-```
-left: 50%;
-bottom: 100%;
+    left: 50%;
+    bottom: 100%;
 
-transform: translateX(-50%);
+    transform: translateX(-50%);
 
-margin-bottom: 28px;
+    margin-bottom: 28px;
 
-max-width: 250px;
+    max-width: 250px;
 
-padding: 8px 12px;
+    padding: 8px 12px;
 
-background: white;
+    background: white;
 
-color: black;
+    color: black;
 
-border: 1px solid #555555;
+    border: 1px solid #555555;
 
-border-radius: 10px;
+    border-radius: 10px;
 
-font-size: 14px;
+    font-size: 14px;
 
-line-height: 1.3;
+    line-height: 1.3;
 
-word-wrap: break-word;
+    word-wrap: break-word;
 
-white-space: normal;
+    white-space: normal;
 
-z-index: 20;
+    z-index: 20;
 
-pointer-events: none;
+    pointer-events: none;
 
-user-select: none;
+    user-select: none;
 
--webkit-user-select: none;
-```
-
+    -webkit-user-select: none;
 }
 
 .speechBubble::after {
-content: "";
+    content: "";
 
-```
-position: absolute;
+    position: absolute;
 
-left: 50%;
-top: 100%;
+    left: 50%;
+    top: 100%;
 
-transform: translateX(-50%);
+    transform: translateX(-50%);
 
-border-left: 7px solid transparent;
-border-right: 7px solid transparent;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
 
-border-top: 7px solid white;
-```
-
+    border-top: 7px solid white;
 }
 
-# /*
 
-# TASKBAR
-
+/*
+============================================================
+TASKBAR
+============================================================
 */
 
 #taskbar {
-position: absolute;
+    position: absolute;
 
-```
-left: 0;
-bottom: 0;
+    left: 0;
+    bottom: 0;
 
-width: 100%;
-height: 50px;
+    width: 100%;
+    height: 50px;
 
-display: flex;
+    display: flex;
 
-padding: 4px;
+    padding: 4px;
 
-background: #c0c0c0;
+    background: #c0c0c0;
 
-border-top: 2px solid #eeeeee;
+    border-top: 2px solid #eeeeee;
 
-z-index: 100;
-```
-
+    z-index: 100;
 }
 
 #startButton {
-width: 80px;
+    width: 80px;
 
-```
-height: 42px;
+    height: 42px;
 
-flex-shrink: 0;
+    flex-shrink: 0;
 
-background: #c0c0c0;
+    background: #c0c0c0;
 
-border: 2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
-font-weight: bold;
+    font-weight: bold;
 
-cursor: pointer;
-```
-
+    cursor: pointer;
 }
 
 #startButton:active {
-border-style: inset;
+    border-style: inset;
 }
 
 #messageInput {
-flex: 1;
+    flex: 1;
 
-```
-min-width: 0;
+    min-width: 0;
 
-height: 42px;
+    height: 42px;
 
-margin-left: 4px;
+    margin-left: 4px;
 
-padding: 0 10px;
+    padding: 0 10px;
 
-font-size: 16px;
+    font-size: 16px;
 
-border: 2px inset #eeeeee;
+    border: 2px inset #eeeeee;
 
-outline: none;
-```
-
+    outline: none;
 }
 
-# /*
 
-# SETTINGS BUTTON
-
+/*
+============================================================
+SETTINGS BUTTON
+============================================================
 */
 
 #settingsButton {
-position: absolute;
+    position: absolute;
 
-```
-top: 10px;
-left: 10px;
+    top: 10px;
+    left: 10px;
 
-padding: 8px 12px;
+    padding: 8px 12px;
 
-background: #c0c0c0;
+    background: #c0c0c0;
 
-color: black;
+    color: black;
 
-border: 2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
-font-size: 14px;
+    font-size: 14px;
 
-cursor: pointer;
+    cursor: pointer;
 
-z-index: 1000;
+    z-index: 1000;
 
-user-select: none;
+    user-select: none;
 
--webkit-user-select: none;
-```
-
+    -webkit-user-select: none;
 }
 
 #settingsButton:active {
-border-style: inset;
+    border-style: inset;
 }
 
-# /*
 
-# SETTINGS PANEL
-
+/*
+============================================================
+SETTINGS PANEL
+============================================================
 */
 
 #settingsPanel {
-position: absolute;
+    position: absolute;
 
-```
-top: 50px;
-left: 10px;
+    top: 50px;
+    left: 10px;
 
-width: 230px;
+    width: 230px;
 
-padding: 15px;
+    padding: 15px;
 
-background: #c0c0c0;
+    background: #c0c0c0;
 
-border: 2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
-box-shadow:
-    4px 4px 10px rgba(0, 0, 0, 0.4);
+    box-shadow:
+        4px 4px 10px rgba(0, 0, 0, 0.4);
 
-display: none;
+    display: none;
 
-z-index: 1001;
-```
-
+    z-index: 1001;
 }
 
 .settingsTitle {
-font-weight: bold;
+    font-weight: bold;
 
-```
-font-size: 16px;
+    font-size: 16px;
 
-margin-bottom: 12px;
-```
-
+    margin-bottom: 12px;
 }
 
 #settingsPanel button {
-margin-top: 10px;
+    margin-top: 10px;
 
-```
-width: 100%;
+    width: 100%;
 
-height: 30px;
+    height: 30px;
 
-background: #c0c0c0;
+    background: #c0c0c0;
 
-border: 2px outset #eeeeee;
+    border: 2px outset #eeeeee;
 
-cursor: pointer;
-```
-
+    cursor: pointer;
 }
 
 #settingsPanel button:active {
-border-style: inset;
+    border-style: inset;
 }
 
-# /*
 
-# ESPEAK PLAYBACK
-
+/*
+============================================================
+ESPEAK AUDIO
+============================================================
 */
 
+#audio,
 #espeakPlaybackContainer {
-position: fixed;
+    position: fixed;
 
-```
-left: -10000px;
-top: -10000px;
+    left: -9999px;
+    top: -9999px;
 
-width: 1px;
-height: 1px;
+    width: 1px;
+    height: 1px;
 
-overflow: hidden;
+    overflow: hidden;
 
-pointer-events: none;
-```
-
+    pointer-events: none;
 }
 
-# /*
 
-# README
-
+/*
+============================================================
+README
+============================================================
 */
 
 #readmeLink {
-position: fixed;
+    position: fixed;
 
-```
-right: 12px;
-bottom: 10px;
+    right: 12px;
+    bottom: 10px;
 
-color: white;
+    color: white;
 
-font-size: 13px;
+    font-size: 13px;
 
-text-decoration: underline;
+    text-decoration: underline;
 
-cursor: pointer;
+    cursor: pointer;
 
-z-index: 100;
-```
-
+    z-index: 100;
 }
 
 #readmeLink:hover {
-color: #cccccc;
+    color: #cccccc;
 }
