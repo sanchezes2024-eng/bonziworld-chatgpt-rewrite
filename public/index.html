@@ -117,9 +117,25 @@
 </div>
 
 
-<!-- AUDIO -->
+<!--
+Temporary container used by speakClient.js
+to generate each eSpeak audio element.
+-->
 
 <div id="audio"></div>
+
+
+<!--
+Every generated audio element is moved here.
+
+Each message gets its own independent audio
+element, allowing voices to overlap.
+-->
+
+<div
+    id="espeakPlaybackContainer"
+    aria-hidden="true"
+></div>
 
 
 <!-- SCRIPTS -->
