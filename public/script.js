@@ -1,397 +1,517 @@
-
 const socket = io();
 
-/*
-============================================================
-ELEMENTS
-============================================================
+# /*
+
+# ELEMENTS
+
 */
 
-const loginScreen = document.getElementById("loginScreen");
-const desktop = document.getElementById("desktop");
-const nameInput = document.getElementById("nameInput");
-const roomInput = document.getElementById("roomInput");
-const submitButton = document.getElementById("submitButton");
-const world = document.getElementById("world");
-const messageInput = document.getElementById("messageInput");
-const startButton = document.getElementById("startButton");
+const loginScreen =
+document.getElementById("loginScreen");
 
-const settingsButton = document.getElementById("settingsButton");
-const settingsPanel = document.getElementById("settingsPanel");
-const closeSettings = document.getElementById("closeSettings");
+const desktop =
+document.getElementById("desktop");
+
+const nameInput =
+document.getElementById("nameInput");
+
+const roomInput =
+document.getElementById("roomInput");
+
+const submitButton =
+document.getElementById("submitButton");
+
+const world =
+document.getElementById("world");
+
+const messageInput =
+document.getElementById("messageInput");
+
+const startButton =
+document.getElementById("startButton");
+
+const settingsButton =
+document.getElementById("settingsButton");
+
+const settingsPanel =
+document.getElementById("settingsPanel");
+
+const closeSettings =
+document.getElementById("closeSettings");
+
+# /*
+
+# PLAYER / ROOM STATE
+
+*/
 
 const players = {};
 
 let myId = null;
+
 let myName = "";
+
 let currentRoom = "default";
 
+# /*
+
+# ESPEAK STATE
+
+*/
+
 /*
-============================================================
-ESPEAK AUDIO STATE
-============================================================
+Each player's message gets its own Audio element.
 
-IMPORTANT:
-
-Every message gets its OWN audio element.
-
-There is NO shared playback queue.
-
-Other people's audio is NEVER stopped.
-
-Only your own previous audio is stopped when
-you send another message.
-============================================================
+There is deliberately NO global audio.stop(),
+audio.pause(), or audioContainer.innerHTML = ""
+after playback has started.
 */
 
 let myEspeakAudio = null;
 
-const audioGenerator =
-    document.getElementById("audio");
+const audioContainer =
+document.getElementById("audio");
 
-const playbackContainer =
-    document.createElement("div");
-
-playbackContainer.id =
-    "espeakPlaybackContainer";
-
-playbackContainer.style.display =
-    "none";
-
-document.body.appendChild(
-    playbackContainer
+let espeakPlaybackContainer =
+document.getElementById(
+"espeakPlaybackContainer"
 );
 
-
 /*
-============================================================
-DEFAULT ROOM
-============================================================
+Fallback in case the HTML does not contain
+the playback container.
+*/
+
+if (!espeakPlaybackContainer) {
+
+```
+espeakPlaybackContainer =
+    document.createElement("div");
+
+espeakPlaybackContainer.id =
+    "espeakPlaybackContainer";
+
+document.body.appendChild(
+    espeakPlaybackContainer
+);
+```
+
+}
+
+# /*
+
+# DEFAULT ROOM
+
 */
 
 if (roomInput) {
-    roomInput.value = "default";
+roomInput.value = "default";
 }
 
+# /*
 
-/*
-============================================================
-SETTINGS
-============================================================
+# SETTINGS
+
 */
 
 if (settingsButton) {
 
-    settingsButton.addEventListener(
-        "click",
-        () => {
+```
+settingsButton.addEventListener(
+    "click",
+    () => {
 
-            if (
-                settingsPanel.style.display ===
-                "block"
-            ) {
-
-                settingsPanel.style.display =
-                    "none";
-
-            } else {
-
-                settingsPanel.style.display =
-                    "block";
-            }
-        }
-    );
-}
-
-
-if (closeSettings) {
-
-    closeSettings.addEventListener(
-        "click",
-        () => {
+        if (
+            settingsPanel.style.display ===
+            "block"
+        ) {
 
             settingsPanel.style.display =
                 "none";
 
+        } else {
+
+            settingsPanel.style.display =
+                "block";
         }
-    );
+    }
+);
+```
+
 }
 
+if (closeSettings) {
 
-/*
-============================================================
-COLOR → HUE
-============================================================
+```
+closeSettings.addEventListener(
+    "click",
+    () => {
+
+        settingsPanel.style.display =
+            "none";
+    }
+);
+```
+
+}
+
+# /*
+
+# COLOR → HUE
+
 */
 
 function colorToHue(color) {
 
-    if (!color) {
-        return 270;
-    }
-
-
-    const colors = {
-
-        red: 0,
-        orange: 30,
-        yellow: 60,
-        green: 120,
-        cyan: 180,
-        blue: 240,
-        purple: 270,
-        magenta: 300,
-        pink: 330
-
-    };
-
-
-    color =
-        color.toLowerCase();
-
-
-    if (
-        colors[color] !== undefined
-    ) {
-
-        return colors[color];
-    }
-
-
-    const hexColors = {
-
-        "#ff0000": 0,
-        "#00ff00": 120,
-        "#0000ff": 240,
-        "#ffff00": 60,
-        "#ff00ff": 300,
-        "#00ffff": 180,
-        "#ff8800": 30,
-        "#8800ff": 270,
-        "#00aa88": 168,
-        "#ff66aa": 330,
-        "#6666ff": 240,
-        "#66cc66": 120,
-        "#ffffff": 270
-
-    };
-
-
-    if (
-        hexColors[color] !== undefined
-    ) {
-
-        return hexColors[color];
-    }
-
-
+```
+if (!color) {
     return 270;
 }
 
 
-/*
-============================================================
-UPDATE PLAYER COLOR
-============================================================
-*/
+const colors = {
 
-function updatePlayerColor(
-    player,
-    color
+    red: 0,
+    orange: 30,
+    yellow: 60,
+    green: 120,
+    cyan: 180,
+    blue: 240,
+    purple: 270,
+    magenta: 300,
+    pink: 330
+
+};
+
+
+color =
+    String(color).toLowerCase();
+
+
+if (
+    colors[color] !== undefined
 ) {
 
-    player.color =
-        color;
-
-
-    const bonzi =
-        player.element.querySelector(
-            ".bonziCharacter"
-        );
-
-
-    if (bonzi) {
-
-        const hue =
-            colorToHue(color);
-
-
-        bonzi.style.setProperty(
-            "--bonzi-hue",
-            `${hue - 270}deg`
-        );
-    }
-
-
-    if (
-        player.character ===
-        "square"
-    ) {
-
-        player.element.style.backgroundColor =
-            color;
-    }
+    return colors[color];
 }
 
 
-/*
-============================================================
-CREATE PLAYER
-============================================================
+const hexColors = {
+
+    "#ff0000": 0,
+    "#00ff00": 120,
+    "#0000ff": 240,
+    "#ffff00": 60,
+    "#ff00ff": 300,
+    "#00ffff": 180,
+    "#ff8800": 30,
+    "#8800ff": 270,
+    "#00aa88": 168,
+    "#ff66aa": 330,
+    "#6666ff": 240,
+    "#66cc66": 120,
+    "#ffffff": 270
+
+};
+
+
+if (
+    hexColors[color] !== undefined
+) {
+
+    return hexColors[color];
+}
+
+
+return 270;
+```
+
+}
+
+# /*
+
+# UPDATE PLAYER COLOR
+
+*/
+
+function updatePlayerColor(
+player,
+color
+) {
+
+```
+player.color =
+    color;
+
+
+const bonzi =
+    player.element.querySelector(
+        ".bonziCharacter"
+    );
+
+
+if (bonzi) {
+
+    const hue =
+        colorToHue(color);
+
+    bonzi.style.setProperty(
+        "--bonzi-hue",
+        `${hue - 270}deg`
+    );
+}
+
+
+if (
+    player.character === "square"
+) {
+
+    player.element.style.backgroundColor =
+        color;
+}
+```
+
+}
+
+# /*
+
+# CREATE PLAYER
+
 */
 
 function createPlayer(data) {
 
-    if (
-        players[data.id]
-    ) {
+```
+if (
+    players[data.id]
+) {
 
-        return players[data.id];
-    }
-
-
-    const element =
-        document.createElement("div");
+    return players[data.id];
+}
 
 
-    element.className =
-        "player";
+const element =
+    document.createElement("div");
+
+element.className =
+    "player";
+
+element.dataset.id =
+    data.id;
 
 
-    element.dataset.id =
-        data.id;
+/*
+PLAYER NAME
+*/
+
+const nameLabel =
+    document.createElement("div");
+
+nameLabel.className =
+    "playerName";
+
+nameLabel.textContent =
+    data.name;
+
+element.appendChild(
+    nameLabel
+);
 
 
-    /*
-    PLAYER NAME
-    */
+/*
+POSITION
+*/
 
-    const nameLabel =
-        document.createElement("div");
+element.style.left =
+    `${data.x}%`;
+
+element.style.top =
+    `${data.y}%`;
 
 
-    nameLabel.className =
-        "playerName";
+/*
+PLAYER DATA
+*/
+
+const player = {
+
+    id:
+        data.id,
+
+    name:
+        data.name,
+
+    x:
+        Number(data.x),
+
+    y:
+        Number(data.y),
+
+    color:
+        data.color ||
+        "#8000ff",
+
+    character:
+        data.character ||
+        "bonzi",
+
+    element:
+        element
+};
 
 
-    nameLabel.textContent =
-        data.name;
+/*
+CHARACTER
+*/
 
+if (
+    player.character === "bonzi"
+) {
+
+    element.classList.add(
+        "bonziPlayer"
+    );
+
+
+    const image =
+        document.createElement("img");
+
+    image.src =
+        "/bonzi.png";
+
+    image.className =
+        "bonziCharacter";
+
+    image.draggable =
+        false;
 
     element.appendChild(
-        nameLabel
+        image
+    );
+
+} else {
+
+    element.classList.add(
+        "squareCharacter"
+    );
+
+    element.style.backgroundColor =
+        player.color;
+}
+
+
+/*
+PUT INTO WORLD
+*/
+
+world.appendChild(
+    element
+);
+
+
+players[data.id] =
+    player;
+
+
+updatePlayerColor(
+    player,
+    player.color
+);
+
+
+/*
+EVERYONE CAN DRAG EVERYONE.
+
+The server receives playerId so it knows
+which character was moved.
+*/
+
+setupDragging(
+    player
+);
+
+
+if (
+    data.id === myId
+) {
+
+    element.classList.add(
+        "myPlayer"
+    );
+}
+
+
+return player;
+```
+
+}
+
+# /*
+
+# CHANGE PLAYER CHARACTER
+
+*/
+
+function updatePlayerCharacter(
+player,
+character
+) {
+
+```
+player.character =
+    character;
+
+
+const oldBonzi =
+    player.element.querySelector(
+        ".bonziCharacter"
     );
 
 
-    /*
-    POSITION
-    */
-
-    element.style.left =
-        `${data.x}%`;
+if (oldBonzi) {
+    oldBonzi.remove();
+}
 
 
-    element.style.top =
-        `${data.y}%`;
+player.element.classList.remove(
+    "bonziPlayer",
+    "squareCharacter"
+);
 
 
-    /*
-    PLAYER DATA
-    */
-
-    const player = {
-
-        id:
-            data.id,
-
-        name:
-            data.name,
-
-        x:
-            data.x,
-
-        y:
-            data.y,
-
-        color:
-            data.color ||
-            "#8000ff",
-
-        character:
-            data.character ||
-            "bonzi",
-
-        element:
-            element
-    };
+player.element.style.backgroundColor =
+    "";
 
 
-    /*
-    CHARACTER
-    */
+/*
+BONZI
+*/
 
-    if (
-        player.character ===
-        "bonzi"
-    ) {
+if (
+    character === "bonzi"
+) {
 
-        element.classList.add(
-            "bonziPlayer"
-        );
-
-
-        const image =
-            document.createElement("img");
-
-
-        image.src =
-            "/bonzi.png";
-
-
-        image.className =
-            "bonziCharacter";
-
-
-        image.draggable =
-            false;
-
-
-        element.appendChild(
-            image
-        );
-
-    } else {
-
-        element.classList.add(
-            "squareCharacter"
-        );
-
-
-        element.style.backgroundColor =
-            player.color;
-    }
-
-
-    /*
-    ADD TO WORLD IMMEDIATELY
-    */
-
-    world.appendChild(
-        element
+    player.element.classList.add(
+        "bonziPlayer"
     );
 
 
-    /*
-    SAVE
-    */
+    const image =
+        document.createElement("img");
 
-    players[data.id] =
-        player;
+    image.src =
+        "/bonzi.png";
 
+    image.className =
+        "bonziCharacter";
 
-    /*
-    COLOR
-    */
+    image.draggable =
+        false;
+
+    player.element.appendChild(
+        image
+    );
+
 
     updatePlayerColor(
         player,
@@ -399,1032 +519,973 @@ function createPlayer(data) {
     );
 
 
-    /*
-    DRAGGING
-    */
-
-    setupDragging(
-        player
-    );
-
-
-    /*
-    OUR PLAYER
-    */
-
-    if (
-        data.id === myId
-    ) {
-
-        element.classList.add(
-            "myPlayer"
-        );
-    }
-
-
-    return player;
+    return;
 }
 
 
 /*
-============================================================
-CHANGE PLAYER CHARACTER
-============================================================
+SQUARE
 */
 
-function updatePlayerCharacter(
-    player,
-    character
+if (
+    character === "square"
 ) {
 
-    player.character =
-        character;
-
-
-    const oldBonzi =
-        player.element.querySelector(
-            ".bonziCharacter"
-        );
-
-
-    if (oldBonzi) {
-        oldBonzi.remove();
-    }
-
-
-    player.element.classList.remove(
-        "bonziPlayer",
+    player.element.classList.add(
         "squareCharacter"
     );
 
-
     player.element.style.backgroundColor =
-        "";
+        player.color;
+}
+```
 
-
-    if (
-        character ===
-        "bonzi"
-    ) {
-
-        player.element.classList.add(
-            "bonziPlayer"
-        );
-
-
-        const image =
-            document.createElement("img");
-
-
-        image.src =
-            "/bonzi.png";
-
-
-        image.className =
-            "bonziCharacter";
-
-
-        image.draggable =
-            false;
-
-
-        player.element.appendChild(
-            image
-        );
-
-
-        updatePlayerColor(
-            player,
-            player.color
-        );
-
-
-        return;
-    }
-
-
-    if (
-        character ===
-        "square"
-    ) {
-
-        player.element.classList.add(
-            "squareCharacter"
-        );
-
-
-        player.element.style.backgroundColor =
-            player.color;
-    }
 }
 
+# /*
 
-/*
-============================================================
-DRAGGING
-============================================================
+# DRAGGING
+
 */
 
 function setupDragging(player) {
 
-    let dragging = false;
+```
+let dragging =
+    false;
 
 
-    player.element.style.cursor =
-        "grab";
+player.element.style.cursor =
+    "grab";
+
+player.element.style.touchAction =
+    "none";
+
+player.element.style.userSelect =
+    "none";
 
 
-    player.element.style.touchAction =
-        "none";
+/*
+START DRAG
+*/
+
+player.element.addEventListener(
+    "pointerdown",
+    (event) => {
+
+        dragging =
+            true;
 
 
-    player.element.style.userSelect =
-        "none";
+        player.element.style.cursor =
+            "grabbing";
 
 
-    player.element.addEventListener(
-        "pointerdown",
-        (event) => {
+        try {
 
-            /*
-            Only YOUR player can move.
-            */
-
-            if (
-                player.id !== myId
-            ) {
-
-                return;
-            }
-
-
-            dragging = true;
-
-
-            player.element.style.cursor =
-                "grabbing";
-
-
-            try {
-
-                player.element.setPointerCapture(
-                    event.pointerId
-                );
-
-            } catch (error) {
-
-                console.log(
-                    "Pointer capture unavailable."
-                );
-            }
-
-
-            event.preventDefault();
-            event.stopPropagation();
-        }
-    );
-
-
-    player.element.addEventListener(
-        "pointermove",
-        (event) => {
-
-            if (!dragging) {
-                return;
-            }
-
-
-            const rect =
-                world.getBoundingClientRect();
-
-
-            let x =
-                (
-                    (
-                        event.clientX -
-                        rect.left
-                    ) /
-                    rect.width
-                ) * 100;
-
-
-            let y =
-                (
-                    (
-                        event.clientY -
-                        rect.top
-                    ) /
-                    rect.height
-                ) * 100;
-
-
-            x =
-                Math.max(
-                    2,
-                    Math.min(
-                        98,
-                        x
-                    )
-                );
-
-
-            y =
-                Math.max(
-                    2,
-                    Math.min(
-                        95,
-                        y
-                    )
-                );
-
-
-            player.x =
-                x;
-
-
-            player.y =
-                y;
-
-
-            player.element.style.left =
-                `${x}%`;
-
-
-            player.element.style.top =
-                `${y}%`;
-
-
-            socket.emit(
-                "move",
-                {
-                    x:
-                        x,
-
-                    y:
-                        y
-                }
+            player.element.setPointerCapture(
+                event.pointerId
             );
 
+        } catch (error) {
 
-            event.preventDefault();
+            console.log(
+                "Pointer capture unavailable."
+            );
         }
-    );
 
 
-    function stopDragging(event) {
+        event.preventDefault();
+
+        event.stopPropagation();
+    }
+);
+
+
+/*
+DRAG
+*/
+
+player.element.addEventListener(
+    "pointermove",
+    (event) => {
 
         if (!dragging) {
             return;
         }
 
 
-        dragging = false;
+        const rect =
+            world.getBoundingClientRect();
 
 
-        player.element.style.cursor =
-            "grab";
+        let x =
+            (
+                (
+                    event.clientX -
+                    rect.left
+                ) /
+                rect.width
+            ) * 100;
 
 
-        try {
+        let y =
+            (
+                (
+                    event.clientY -
+                    rect.top
+                ) /
+                rect.height
+            ) * 100;
 
-            player.element.releasePointerCapture(
-                event.pointerId
+
+        x =
+            Math.max(
+                2,
+                Math.min(
+                    98,
+                    x
+                )
             );
 
-        } catch (error) {
-            // Already released.
-        }
+
+        y =
+            Math.max(
+                2,
+                Math.min(
+                    98,
+                    y
+                )
+            );
+
+
+        /*
+        Update this player's local position.
+        */
+
+        player.x =
+            x;
+
+        player.y =
+            y;
+
+
+        player.element.style.left =
+            `${x}%`;
+
+        player.element.style.top =
+            `${y}%`;
+
+
+        /*
+        IMPORTANT:
+
+        Include player.id.
+
+        The server needs this because
+        anyone can drag anyone.
+        */
+
+        socket.emit(
+            "move",
+            {
+                playerId:
+                    player.id,
+
+                x:
+                    x,
+
+                y:
+                    y
+            }
+        );
+
+
+        event.preventDefault();
     }
-
-
-    player.element.addEventListener(
-        "pointerup",
-        stopDragging
-    );
-
-
-    player.element.addEventListener(
-        "pointercancel",
-        stopDragging
-    );
-
-
-    player.element.addEventListener(
-        "lostpointercapture",
-        () => {
-
-            dragging = false;
-
-            player.element.style.cursor =
-                "grab";
-        }
-    );
-}
+);
 
 
 /*
-============================================================
-LOGIN
-============================================================
+STOP DRAG
+*/
+
+function stopDragging(event) {
+
+    if (!dragging) {
+        return;
+    }
+
+
+    dragging =
+        false;
+
+
+    player.element.style.cursor =
+        "grab";
+
+
+    try {
+
+        player.element.releasePointerCapture(
+            event.pointerId
+        );
+
+    } catch (error) {
+        // Already released.
+    }
+}
+
+
+player.element.addEventListener(
+    "pointerup",
+    stopDragging
+);
+
+
+player.element.addEventListener(
+    "pointercancel",
+    stopDragging
+);
+
+
+player.element.addEventListener(
+    "lostpointercapture",
+    () => {
+
+        dragging =
+            false;
+
+        player.element.style.cursor =
+            "grab";
+    }
+);
+```
+
+}
+
+# /*
+
+# LOGIN
+
 */
 
 function joinRoom() {
 
-    let name =
-        nameInput.value.trim();
+```
+let name =
+    nameInput.value.trim();
+
+let room =
+    roomInput.value.trim();
 
 
-    let room =
-        roomInput.value.trim();
-
-
-    if (!name) {
-        name = "Anonymous";
-    }
-
-
-    if (!room) {
-        room = "default";
-    }
-
-
-    myName =
-        name;
-
-
-    currentRoom =
-        room;
-
-
-    socket.emit(
-        "joinRoom",
-        {
-            name:
-                name,
-
-            room:
-                room
-        }
-    );
+if (!name) {
+    name = "Anonymous";
 }
 
 
-submitButton.addEventListener(
-    "click",
-    joinRoom
-);
+if (!room) {
+    room = "default";
+}
 
+
+myName =
+    name;
+
+currentRoom =
+    room;
+
+
+socket.emit(
+    "joinRoom",
+    {
+        name:
+            name,
+
+        room:
+            room
+    }
+);
+```
+
+}
+
+submitButton.addEventListener(
+"click",
+joinRoom
+);
 
 nameInput.addEventListener(
-    "keydown",
-    (event) => {
+"keydown",
+(event) => {
 
-        if (
-            event.key === "Enter"
-        ) {
+```
+    if (
+        event.key === "Enter"
+    ) {
 
-            joinRoom();
-        }
+        joinRoom();
     }
-);
+}
+```
 
+);
 
 roomInput.addEventListener(
-    "keydown",
-    (event) => {
+"keydown",
+(event) => {
 
-        if (
-            event.key === "Enter"
-        ) {
+```
+    if (
+        event.key === "Enter"
+    ) {
 
-            joinRoom();
-        }
+        joinRoom();
     }
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-JOINED
-============================================================
+# JOINED
+
 */
 
 socket.on(
-    "joined",
-    (data) => {
+"joined",
+(data) => {
 
-        myId =
-            data.id;
-
-
-        loginScreen.style.display =
-            "none";
+```
+    myId =
+        data.id;
 
 
-        desktop.style.display =
-            "block";
+    loginScreen.style.display =
+        "none";
 
 
-        createPlayer(
-            data
-        );
-    }
+    desktop.style.display =
+        "block";
+
+
+    createPlayer(
+        data
+    );
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-PLAYER JOINED
-============================================================
+# PLAYER JOINED
+
 */
 
 socket.on(
-    "playerJoined",
-    (data) => {
+"playerJoined",
+(data) => {
 
-        createPlayer(
-            data
-        );
-    }
+```
+    createPlayer(
+        data
+    );
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-PLAYER MOVED
-============================================================
+# PLAYER MOVED
+
 */
 
 socket.on(
-    "playerMoved",
-    (data) => {
+"playerMoved",
+(data) => {
 
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
+```
+    const player =
+        players[data.id];
 
 
-        player.x =
-            data.x;
-
-
-        player.y =
-            data.y;
-
-
-        player.element.style.left =
-            `${data.x}%`;
-
-
-        player.element.style.top =
-            `${data.y}%`;
+    if (!player) {
+        return;
     }
+
+
+    player.x =
+        Number(data.x);
+
+    player.y =
+        Number(data.y);
+
+
+    player.element.style.left =
+        `${data.x}%`;
+
+    player.element.style.top =
+        `${data.y}%`;
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-PLAYER COLOR
-============================================================
+# PLAYER COLOR CHANGED
+
 */
 
 socket.on(
-    "playerColorChanged",
-    (data) => {
+"playerColorChanged",
+(data) => {
 
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
+```
+    const player =
+        players[data.id];
 
 
-        updatePlayerColor(
-            player,
-            data.color
-        );
+    if (!player) {
+        return;
     }
+
+
+    updatePlayerColor(
+        player,
+        data.color
+    );
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-PLAYER CHARACTER
-============================================================
+# PLAYER CHARACTER CHANGED
+
 */
 
 socket.on(
-    "playerCharacterChanged",
-    (data) => {
+"playerCharacterChanged",
+(data) => {
 
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
+```
+    const player =
+        players[data.id];
 
 
-        updatePlayerCharacter(
-            player,
-            data.character
-        );
+    if (!player) {
+        return;
     }
+
+
+    updatePlayerCharacter(
+        player,
+        data.character
+    );
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-PLAYER LEFT
-============================================================
+# PLAYER LEFT
+
 */
 
 socket.on(
-    "playerLeft",
-    (data) => {
+"playerLeft",
+(data) => {
 
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
+```
+    const player =
+        players[data.id];
 
 
-        player.element.remove();
-
-
-        delete players[data.id];
+    if (!player) {
+        return;
     }
+
+
+    player.element.remove();
+
+    delete players[data.id];
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-CHAT MESSAGE
-============================================================
+# CHAT MESSAGE
+
 */
 
 socket.on(
-    "message",
-    (data) => {
+"message",
+(data) => {
 
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
+```
+    const player =
+        players[data.id];
 
 
-        showSpeechBubble(
-            player,
-            data.text
-        );
+    if (!player) {
+        return;
     }
+
+
+    showSpeechBubble(
+        player,
+        data.text
+    );
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-SYSTEM MESSAGE
-============================================================
+# SYSTEM MESSAGE
+
 */
 
 socket.on(
-    "systemMessage",
-    (data) => {
+"systemMessage",
+(data) => {
 
-        console.log(
-            "System:",
-            data.text
-        );
-    }
+```
+    console.log(
+        "System:",
+        data.text
+    );
+}
+```
+
 );
 
+# /*
 
-/*
-============================================================
-SPEECH BUBBLE
-============================================================
+# SPEECH BUBBLE
+
 */
 
 function showSpeechBubble(
-    player,
-    text
+player,
+text
 ) {
 
-    const oldBubble =
-        player.element.querySelector(
-            ".speechBubble"
-        );
+```
+/*
+Replace only this player's previous
+bubble.
 
+It does NOT affect another player's bubble.
+*/
 
-    if (oldBubble) {
-        oldBubble.remove();
-    }
-
-
-    const bubble =
-        document.createElement("div");
-
-
-    bubble.className =
-        "speechBubble";
-
-
-    bubble.textContent =
-        text;
-
-
-    player.element.appendChild(
-        bubble
+const oldBubble =
+    player.element.querySelector(
+        ".speechBubble"
     );
 
 
-    /*
-    ========================================================
-    eSPEAK ONLY
-    ========================================================
-    */
-
-    if (
-        typeof speak !== "function"
-    ) {
-
-        setTimeout(
-            () => {
-
-                if (
-                    bubble.parentNode
-                ) {
-
-                    bubble.remove();
-                }
-
-            },
-            5000
-        );
-
-        return;
-    }
+if (oldBubble) {
+    oldBubble.remove();
+}
 
 
-    if (!audioGenerator) {
+const bubble =
+    document.createElement("div");
 
-        setTimeout(
-            () => {
+bubble.className =
+    "speechBubble";
 
-                if (
-                    bubble.parentNode
-                ) {
-
-                    bubble.remove();
-                }
-
-            },
-            5000
-        );
-
-        return;
-    }
+bubble.textContent =
+    text;
 
 
-    /*
-    ========================================================
-    GENERATE SPEECH
-    ========================================================
-
-    #audio is ONLY a temporary generator.
-
-    We clear it BEFORE generating.
-
-    Once the generated audio exists, it is
-    immediately removed from #audio and placed
-    into its own permanent playback container.
-    */
-
-    audioGenerator.innerHTML =
-        "";
+player.element.appendChild(
+    bubble
+);
 
 
-    speak(
-        text,
-        {
-            amplitude:
-                100,
+/*
+========================================================
+ESPEAK ONLY
+========================================================
+*/
 
-            pitch:
-                50,
+if (
+    typeof speak !== "function"
+) {
 
-            speed:
-                175,
+    setTimeout(
+        () => {
 
-            voice:
-                "en/en-us"
-        }
+            if (
+                bubble.parentNode
+            ) {
+
+                bubble.remove();
+            }
+
+        },
+        5000
     );
 
-
-    let attempts =
-        0;
-
-
-    const waitForAudio =
-        setInterval(
-            () => {
-
-                attempts++;
+    return;
+}
 
 
-                const generatedAudio =
-                    audioGenerator.querySelector(
-                        "audio"
+if (!audioContainer) {
+
+    setTimeout(
+        () => {
+
+            if (
+                bubble.parentNode
+            ) {
+
+                bubble.remove();
+            }
+
+        },
+        5000
+    );
+
+    return;
+}
+
+
+/*
+IMPORTANT:
+
+speak() uses #audio as its temporary
+generation area.
+
+Clear only BEFORE generating this
+particular message.
+*/
+
+audioContainer.innerHTML =
+    "";
+
+
+/*
+Generate eSpeak audio.
+*/
+
+speak(
+    text,
+    {
+        amplitude:
+            100,
+
+        pitch:
+            50,
+
+        speed:
+            175,
+
+        voice:
+            "en/en-us"
+    }
+);
+
+
+let attempts =
+    0;
+
+
+const waitForAudio =
+    setInterval(
+        () => {
+
+            attempts++;
+
+
+            const audio =
+                audioContainer.querySelector(
+                    "audio"
+                );
+
+
+            if (audio) {
+
+                clearInterval(
+                    waitForAudio
+                );
+
+
+                /*
+                ==================================================
+                DETACH THE AUDIO IMMEDIATELY
+                ==================================================
+
+                Once detached from #audio, future
+                calls to speak() cannot delete it.
+                */
+
+                audioContainer.removeChild(
+                    audio
+                );
+
+
+                /*
+                Create an independent playback
+                wrapper for this message.
+                */
+
+                const playback =
+                    document.createElement(
+                        "div"
                     );
 
 
-                if (generatedAudio) {
-
-                    clearInterval(
-                        waitForAudio
-                    );
+                playback.className =
+                    "espeakAudioInstance";
 
 
-                    /*
-                    ====================================================
-                    DETACH FROM GENERATOR
-                    ====================================================
-                    */
-
-                    audioGenerator.removeChild(
-                        generatedAudio
-                    );
+                playback.appendChild(
+                    audio
+                );
 
 
-                    /*
-                    ====================================================
-                    CREATE COMPLETELY INDEPENDENT AUDIO
-                    ====================================================
-                    */
-
-                    const playback =
-                        document.createElement(
-                            "div"
-                        );
+                espeakPlaybackContainer.appendChild(
+                    playback
+                );
 
 
-                    playback.className =
-                        "espeakAudioInstance";
+                /*
+                ==================================================
+                OWN MESSAGE TRACKING
+                ==================================================
 
+                If YOU send another message, your
+                previous speech is stopped.
 
-                    playback.style.display =
-                        "none";
+                Other players' audio is untouched.
+                */
 
-
-                    playback.appendChild(
-                        generatedAudio
-                    );
-
-
-                    playbackContainer.appendChild(
-                        playback
-                    );
-
-
-                    /*
-                    ====================================================
-                    OWN MESSAGE INTERRUPT
-                    ====================================================
-
-                    If this is YOUR message, stop only
-                    your previous message.
-
-                    If this belongs to somebody else,
-                    DO NOTHING to previous audio.
-                    */
+                if (
+                    player.id === myId
+                ) {
 
                     if (
-                        player.id === myId
+                        myEspeakAudio &&
+                        myEspeakAudio !== audio
                     ) {
 
-                        if (
-                            myEspeakAudio &&
-                            myEspeakAudio !==
-                                generatedAudio
-                        ) {
+                        try {
 
-                            try {
+                            myEspeakAudio.pause();
 
-                                myEspeakAudio.pause();
+                            myEspeakAudio.currentTime =
+                                0;
 
-                                myEspeakAudio.currentTime =
-                                    0;
+                        } catch (error) {
 
-                            } catch (error) {
-
-                                console.log(
-                                    "Could not stop previous own TTS:",
-                                    error
-                                );
-                            }
+                            console.log(
+                                "Could not stop previous own eSpeak audio:",
+                                error
+                            );
                         }
-
-
-                        myEspeakAudio =
-                            generatedAudio;
                     }
 
 
-                    /*
-                    ====================================================
-                    CLEANUP
-                    ====================================================
-                    */
-
-                    const cleanup =
-                        () => {
-
-                            if (
-                                bubble.parentNode
-                            ) {
-
-                                bubble.remove();
-                            }
-
-
-                            playback.remove();
-
-
-                            if (
-                                player.id === myId &&
-                                myEspeakAudio ===
-                                    generatedAudio
-                            ) {
-
-                                myEspeakAudio =
-                                    null;
-                            }
-                        };
-
-
-                    generatedAudio.addEventListener(
-                        "ended",
-                        cleanup,
-                        {
-                            once: true
-                        }
-                    );
-
-
-                    generatedAudio.addEventListener(
-                        "error",
-                        cleanup,
-                        {
-                            once: true
-                        }
-                    );
-
-
-                    /*
-                    ====================================================
-                    START PLAYING IMMEDIATELY
-                    ====================================================
-
-                    There is deliberately NO queue and NO
-                    shared audio element.
-
-                    Therefore:
-
-                    Person A ────────▶
-                    Person B ─────▶
-                    Person C ───▶
-
-                    All three can play simultaneously.
-                    */
-
-                    const playPromise =
-                        generatedAudio.play();
-
-
-                    if (
-                        playPromise &&
-                        typeof playPromise.catch ===
-                            "function"
-                    ) {
-
-                        playPromise.catch(
-                            (error) => {
-
-                                console.log(
-                                    "eSpeak playback error:",
-                                    error
-                                );
-
-                            }
-                        );
-                    }
-
-
-                    return;
+                    myEspeakAudio =
+                        audio;
                 }
 
 
                 /*
-                ====================================================
-                GENERATION TIMEOUT
-                ====================================================
+                ==================================================
+                AUDIO FINISHED
+                ==================================================
                 */
 
+                const cleanup =
+                    () => {
+
+                        if (
+                            bubble.parentNode
+                        ) {
+
+                            bubble.remove();
+                        }
+
+
+                        playback.remove();
+
+
+                        if (
+                            player.id === myId &&
+                            myEspeakAudio === audio
+                        ) {
+
+                            myEspeakAudio =
+                                null;
+                        }
+                    };
+
+
+                audio.addEventListener(
+                    "ended",
+                    cleanup,
+                    {
+                        once:
+                            true
+                    }
+                );
+
+
+                audio.addEventListener(
+                    "error",
+                    cleanup,
+                    {
+                        once:
+                            true
+                    }
+                );
+
+
+                /*
+                ==================================================
+                PLAY
+                ==================================================
+
+                No global pause.
+                No global stop.
+                No speech queue.
+
+                Every Audio object plays independently.
+                */
+
+                const playPromise =
+                    audio.play();
+
+
                 if (
-                    attempts >= 200
+                    playPromise &&
+                    typeof playPromise.catch ===
+                        "function"
                 ) {
 
-                    clearInterval(
-                        waitForAudio
+                    playPromise.catch(
+                        (error) => {
+
+                            console.log(
+                                "eSpeak playback error:",
+                                error
+                            );
+
+                        }
                     );
-
-
-                    if (
-                        bubble.parentNode
-                    ) {
-
-                        bubble.remove();
-                    }
                 }
 
-            },
-            50
-        );
+
+                return;
+            }
+
+
+            /*
+            ==================================================
+            GENERATION TIMEOUT
+            ==================================================
+            */
+
+            if (
+                attempts >= 200
+            ) {
+
+                clearInterval(
+                    waitForAudio
+                );
+
+
+                if (
+                    bubble.parentNode
+                ) {
+
+                    bubble.remove();
+                }
+            }
+
+        },
+        50
+    );
+```
+
 }
 
+# /*
 
-/*
-============================================================
-SEND MESSAGE
-============================================================
+# SEND MESSAGE
+
 */
 
 function sendMessage() {
 
-    const text =
-        messageInput.value.trim();
+```
+const text =
+    messageInput.value.trim();
 
 
-    if (!text) {
-        return;
-    }
-
-
-    socket.emit(
-        "message",
-        text
-    );
-
-
-    messageInput.value =
-        "";
-
-
-    messageInput.focus();
+if (!text) {
+    return;
 }
 
 
+socket.emit(
+    "message",
+    text
+);
+
+
+messageInput.value =
+    "";
+
+messageInput.focus();
+```
+
+}
+
 startButton.addEventListener(
-    "click",
-    sendMessage
+"click",
+sendMessage
 );
-
 
 messageInput.addEventListener(
-    "keydown",
-    (event) => {
+"keydown",
+(event) => {
 
-        if (
-            event.key === "Enter"
-        ) {
+```
+    if (
+        event.key === "Enter"
+    ) {
 
-            event.preventDefault();
+        event.preventDefault();
 
-            sendMessage();
-        }
+        sendMessage();
     }
-);
+}
+```
 
+);
 
 messageInput.addEventListener(
-    "focus",
-    () => {
+"focus",
+() => {
 
-        messageInput.select();
-    }
+```
+    messageInput.select();
+}
+```
+
 );
-
