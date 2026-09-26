@@ -7,153 +7,132 @@ body {
     width: 100%;
     height: 100%;
     margin: 0;
+    padding: 0;
     overflow: hidden;
-    font-family: Arial, sans-serif;
+    font-family: Tahoma, Arial, sans-serif;
+    font-size: 12px;
 }
 
+body {
+    background: #008080;
+}
 
-/*
-============================================================
-LOGIN
-============================================================
-*/
+input {
+    font-family: Tahoma, Arial, sans-serif;
+    font-size: 12px;
+}
 
 #loginScreen {
-    position: fixed;
-
+    position: absolute;
     left: 0;
     top: 0;
-
-    width: 100%;
-    height: 100%;
-
-    display: flex;
-
-    align-items: center;
-    justify-content: center;
+    right: 0;
+    bottom: 0;
 
     background: #202020;
-}
-
-.loginBox {
-    width: 320px;
-
-    padding: 30px;
-
-    background: #eeeeee;
-
-    border: 2px solid #555555;
-
-    box-shadow:
-        0 10px 30px rgba(0, 0, 0, 0.5);
-
-    display: flex;
-
-    flex-direction: column;
-
-    gap: 12px;
-}
-
-.loginBox h1 {
-    margin: 0 0 10px 0;
-
     text-align: center;
 }
 
-.loginBox input {
-    width: 100%;
+.loginBox {
+    position: absolute;
 
-    height: 42px;
+    width: 320px;
+    height: 235px;
 
-    padding: 0 10px;
+    left: 50%;
+    top: 50%;
 
-    font-size: 16px;
+    margin-left: -160px;
+    margin-top: -118px;
 
-    border: 1px solid #888888;
-
-    outline: none;
-}
-
-.loginBox input:focus {
-    border-color: #444444;
-}
-
-.loginBox button {
-    width: 100%;
-
-    height: 42px;
+    padding: 15px;
 
     background: #c0c0c0;
 
-    border: 2px outset #eeeeee;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #404040;
+    border-bottom: 2px solid #404040;
 
-    font-size: 16px;
-
-    cursor: pointer;
+    text-align: left;
 }
 
-.loginBox button:active {
-    border-style: inset;
+.loginTitle {
+    height: 28px;
+
+    margin: -15px -15px 15px -15px;
+    padding: 6px;
+
+    background: #000080;
+    color: #ffffff;
+
+    font-weight: bold;
 }
 
+.loginLabel {
+    margin-top: 8px;
+    margin-bottom: 3px;
+}
 
-/*
-============================================================
-DESKTOP
-============================================================
-*/
+#nameInput,
+#roomInput {
+    width: 100%;
+    height: 24px;
+
+    border: 2px inset #ffffff;
+    padding: 2px;
+}
+
+#submitButton {
+    width: 110px;
+    height: 25px;
+
+    margin-top: 15px;
+
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #404040;
+    border-bottom: 2px solid #404040;
+
+    background: #c0c0c0;
+}
+
+.readme {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+}
+
+.readme a {
+    color: #000080;
+}
 
 #desktop {
-    position: fixed;
-
-    left: 0;
-    top: 0;
-
-    width: 100%;
-    height: 100%;
-
     display: none;
 
-    background-image: url("/background.png");
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
 
-    background-size: cover;
-
-    background-position: center;
-
-    background-repeat: no-repeat;
+    background: #008080;
 }
-
-
-/*
-============================================================
-WORLD
-============================================================
-*/
 
 #world {
     position: absolute;
 
     left: 0;
     top: 0;
-
-    width: 100%;
-    height: calc(100% - 50px);
+    right: 0;
+    bottom: 50px;
 
     overflow: hidden;
 
-    touch-action: none;
+    background: #008080;
 
-    user-select: none;
-
-    -webkit-user-select: none;
+    cursor: default;
 }
-
-
-/*
-============================================================
-PLAYERS
-============================================================
-*/
 
 .player {
     position: absolute;
@@ -161,117 +140,81 @@ PLAYERS
     width: 50px;
     height: 50px;
 
-    transform: translate(-50%, -50%);
+    margin-left: -25px;
+    margin-top: -25px;
 
-    user-select: none;
-
-    -webkit-user-select: none;
-
-    touch-action: none;
-
-    cursor: grab;
-
-    pointer-events: auto;
+    cursor: move;
 
     z-index: 5;
-}
 
-.player:active {
-    cursor: grabbing;
-}
+    text-align: center;
 
-
-/*
-============================================================
-SQUARE
-============================================================
-*/
-
-.player.squareCharacter {
-    width: 50px;
-    height: 50px;
-
-    background: purple;
-
-    border: 2px solid #300030;
-}
-
-
-/*
-============================================================
-BONZI
-============================================================
-*/
-
-.player.bonziPlayer {
-    width: 105px;
-    height: 105px;
-
-    background: transparent;
-
-    border: none;
-}
-
-.bonziCharacter {
-    display: block;
-
-    width: 100%;
-    height: 100%;
-
-    object-fit: contain;
-
-    pointer-events: none;
-
-    user-select: none;
+    -ms-touch-action: none;
+    touch-action: none;
 
     -webkit-user-select: none;
-
-    filter:
-        hue-rotate(
-            var(--bonzi-hue, 0deg)
-        );
+    -moz-user-select: none;
+    user-select: none;
 }
-
-
-/*
-============================================================
-PLAYER NAME
-============================================================
-*/
 
 .playerName {
     position: absolute;
 
     left: 50%;
+    top: -18px;
 
-    bottom: 100%;
+    width: 160px;
 
-    transform: translateX(-50%);
+    margin-left: -80px;
 
-    margin-bottom: 5px;
+    text-align: center;
 
-    color: white;
+    color: #ffffff;
 
-    font-size: 13px;
+    font-weight: bold;
 
     white-space: nowrap;
 
     text-shadow:
-        1px 1px 2px black;
-
-    pointer-events: none;
-
-    user-select: none;
-
-    -webkit-user-select: none;
+        1px 1px 1px #000000,
+        -1px -1px 1px #000000;
 }
 
+.squareCharacter {
+    position: absolute;
 
-/*
-============================================================
-SPEECH BUBBLE
-============================================================
-*/
+    left: 0;
+    top: 0;
+
+    width: 50px;
+    height: 50px;
+
+    background: #8800ff;
+
+    border: 2px solid #000000;
+}
+
+.bonziPlayer {
+    width: 105px;
+    height: 105px;
+
+    margin-left: -52px;
+    margin-top: -52px;
+}
+
+.bonziCharacter {
+    position: absolute;
+
+    left: 0;
+    top: 0;
+
+    width: 105px;
+    height: 105px;
+
+    border: 0;
+
+    pointer-events: none;
+}
 
 .speechBubble {
     position: absolute;
@@ -279,257 +222,171 @@ SPEECH BUBBLE
     left: 50%;
     bottom: 100%;
 
-    transform: translateX(-50%);
+    width: 190px;
 
-    margin-bottom: 28px;
+    margin-left: -95px;
+    margin-bottom: 10px;
 
-    max-width: 250px;
+    padding: 6px;
 
-    padding: 8px 12px;
+    background: #ffffff;
+    color: #000000;
 
-    background: white;
+    border: 1px solid #000000;
 
-    color: black;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
 
-    border: 1px solid #555555;
-
-    border-radius: 10px;
-
-    font-size: 14px;
-
-    line-height: 1.3;
-
-    word-wrap: break-word;
-
-    white-space: normal;
+    text-align: left;
 
     z-index: 20;
 
-    pointer-events: none;
-
-    user-select: none;
-
-    -webkit-user-select: none;
+    word-wrap: break-word;
 }
 
-.speechBubble::after {
-    content: "";
-
+.speechBubbleArrow {
     position: absolute;
 
     left: 50%;
-    top: 100%;
+    bottom: -8px;
 
-    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+
+    margin-left: -8px;
+
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #000000;
+}
+
+.speechBubbleArrowInner {
+    position: absolute;
+
+    left: -7px;
+    top: -9px;
+
+    width: 0;
+    height: 0;
 
     border-left: 7px solid transparent;
     border-right: 7px solid transparent;
-
-    border-top: 7px solid white;
+    border-top: 7px solid #ffffff;
 }
-
-
-/*
-============================================================
-TASKBAR
-============================================================
-*/
 
 #taskbar {
     position: absolute;
 
     left: 0;
+    right: 0;
     bottom: 0;
 
-    width: 100%;
     height: 50px;
-
-    display: flex;
-
-    padding: 4px;
 
     background: #c0c0c0;
 
-    border-top: 2px solid #eeeeee;
+    border-top: 2px solid #ffffff;
 
-    z-index: 100;
+    padding: 8px;
 }
 
 #startButton {
-    width: 80px;
+    float: left;
 
-    height: 42px;
+    width: 65px;
+    height: 32px;
 
-    flex-shrink: 0;
-
-    background: #c0c0c0;
-
-    border: 2px outset #eeeeee;
+    margin-right: 8px;
 
     font-weight: bold;
 
-    cursor: pointer;
-}
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #404040;
+    border-bottom: 2px solid #404040;
 
-#startButton:active {
-    border-style: inset;
+    background: #c0c0c0;
 }
 
 #messageInput {
-    flex: 1;
+    display: block;
 
-    min-width: 0;
+    height: 32px;
 
-    height: 42px;
+    width: auto;
 
-    margin-left: 4px;
+    margin-right: 0;
 
-    padding: 0 10px;
+    overflow: hidden;
 
-    font-size: 16px;
+    border: 2px inset #ffffff;
 
-    border: 2px inset #eeeeee;
+    padding: 4px;
 
-    outline: none;
+    font-size: 14px;
 }
-
-
-/*
-============================================================
-SETTINGS BUTTON
-============================================================
-*/
 
 #settingsButton {
     position: absolute;
 
-    top: 10px;
-    left: 10px;
+    left: 8px;
+    top: 8px;
 
-    padding: 8px 12px;
+    z-index: 100;
+
+    height: 25px;
 
     background: #c0c0c0;
 
-    color: black;
-
-    border: 2px outset #eeeeee;
-
-    font-size: 14px;
-
-    cursor: pointer;
-
-    z-index: 1000;
-
-    user-select: none;
-
-    -webkit-user-select: none;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #404040;
+    border-bottom: 2px solid #404040;
 }
-
-#settingsButton:active {
-    border-style: inset;
-}
-
-
-/*
-============================================================
-SETTINGS PANEL
-============================================================
-*/
 
 #settingsPanel {
+    display: none;
+
     position: absolute;
 
-    top: 50px;
-    left: 10px;
+    left: 8px;
+    top: 38px;
 
-    width: 230px;
+    width: 280px;
 
-    padding: 15px;
+    padding: 12px;
 
     background: #c0c0c0;
 
-    border: 2px outset #eeeeee;
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #404040;
+    border-bottom: 2px solid #404040;
 
-    box-shadow:
-        4px 4px 10px rgba(0, 0, 0, 0.4);
-
-    display: none;
-
-    z-index: 1001;
+    z-index: 101;
 }
 
 .settingsTitle {
     font-weight: bold;
 
-    font-size: 16px;
+    color: #ffffff;
 
+    background: #000080;
+
+    padding: 4px;
+
+    margin: -12px -12px 12px -12px;
+}
+
+.settingsText {
     margin-bottom: 12px;
 }
 
-#settingsPanel button {
-    margin-top: 10px;
-
-    width: 100%;
-
-    height: 30px;
-
-    background: #c0c0c0;
-
-    border: 2px outset #eeeeee;
-
-    cursor: pointer;
+#closeSettings {
+    width: 70px;
+    height: 24px;
 }
 
-#settingsPanel button:active {
-    border-style: inset;
-}
-
-
-/*
-============================================================
-ESPEAK AUDIO
-============================================================
-*/
-
-#audio,
-#espeakPlaybackContainer {
-    position: fixed;
-
-    left: -9999px;
-    top: -9999px;
-
-    width: 1px;
-    height: 1px;
-
-    overflow: hidden;
-
-    pointer-events: none;
-}
-
-
-/*
-============================================================
-README
-============================================================
-*/
-
-#readmeLink {
-    position: fixed;
-
-    right: 12px;
-    bottom: 10px;
-
-    color: white;
-
-    font-size: 13px;
-
-    text-decoration: underline;
-
-    cursor: pointer;
-
-    z-index: 100;
-}
-
-#readmeLink:hover {
-    color: #cccccc;
+.ttsAudio {
+    display: none;
 }
