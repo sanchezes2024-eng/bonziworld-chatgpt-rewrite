@@ -1,76 +1,159 @@
 <!DOCTYPE html>
-
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
 
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
->
+    <title>Chat Desktop</title>
 
-<title>Chat Desktop</title>
-
-<link
-    rel="stylesheet"
-    type="text/css"
-    href="/style.css"
->
-
-
+    <link
+        rel="stylesheet"
+        type="text/css"
+        href="/style.css"
+    >
 </head>
 
 <body>
 
+    <!-- =====================================================
+         LOGIN SCREEN
+         ===================================================== -->
 
-<!-- ======================================================
-     LOGIN SCREEN
-     ====================================================== -->
+    <div id="loginScreen">
 
-<div id="loginScreen">
+        <div class="loginBox">
 
-    <div class="loginBox">
+            <h1 class="loginTitle">
+                Chat Desktop
+            </h1>
 
-        <h1 class="loginTitle">
-            Chat Desktop
-        </h1>
+            <label
+                class="loginLabel"
+                for="nameInput"
+            >
+                Name:
+            </label>
 
-        <label
-            class="loginLabel"
-            for="nameInput"
-        >
-            Name:
-        </label>
+            <input
+                type="text"
+                id="nameInput"
+                maxlength="30"
+                autocomplete="off"
+            >
 
-        <input
-            type="text"
-            id="nameInput"
-            maxlength="30"
-            autocomplete="off"
-        >
+            <label
+                class="loginLabel"
+                for="roomInput"
+            >
+                Room:
+            </label>
 
-        <label
-            class="loginLabel"
-            for="roomInput"
-        >
-            Room:
-        </label>
+            <input
+                type="text"
+                id="roomInput"
+                value="default"
+                maxlength="30"
+                autocomplete="off"
+            >
 
-        <input
-            type="text"
-            id="roomInput"
-            value="default"
-            maxlength="30"
-            autocomplete="off"
-        >
+            <button
+                type="button"
+                id="submitButton"
+            >
+                Enter
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================================
+         DESKTOP
+         ===================================================== -->
+
+    <div id="desktop">
+
+        <!-- SETTINGS BUTTON -->
 
         <button
             type="button"
-            id="submitButton"
+            id="settingsButton"
         >
-            Enter
+            Settings
         </button>
+
+
+        <!-- SETTINGS PANEL -->
+
+        <div id="settingsPanel">
+
+            <div>
+                <strong>Text to speech:</strong>
+            </div>
+
+            <div>
+                eSpeak
+            </div>
+
+            <button
+                type="button"
+                id="settingsClose"
+            >
+                Close
+            </button>
+
+        </div>
+
+
+        <!-- =================================================
+             WORLD
+             ================================================= -->
+
+        <div id="world">
+        </div>
+
+
+        <!-- =================================================
+             TASKBAR
+             ================================================= -->
+
+        <div id="taskbar">
+
+            <button
+                type="button"
+                id="startButton"
+            >
+                Start
+            </button>
+
+            <input
+                type="text"
+                id="messageInput"
+                maxlength="500"
+                autocomplete="off"
+                placeholder="Type a message..."
+            >
+
+        </div>
+
+
+        <!-- =================================================
+             SPEAK.JS AUDIO CONTAINER
+
+             speakClient.js creates the audio element here.
+             ================================================= -->
+
+        <div id="audio">
+        </div>
+
+
+        <!-- README -->
 
         <a
             href="/readme.html"
@@ -81,113 +164,29 @@
 
     </div>
 
-</div>
+
+    <!-- =====================================================
+         SPEAK.JS
+
+         speakClient.js is the client-side entry point.
+         It handles speakWorker.js and speakGenerator.js.
+         ===================================================== -->
+
+    <script
+        type="text/javascript"
+        src="/speakClient.js"
+    ></script>
 
 
-<!-- ======================================================
-     DESKTOP
-     ====================================================== -->
+    <!-- =====================================================
+         CHAT CLIENT
+         ===================================================== -->
 
-<div id="desktop">
-
-    <!-- SETTINGS -->
-
-    <button
-        type="button"
-        id="settingsButton"
-    >
-        Settings
-    </button>
-
-    <div id="settingsPanel">
-
-        <div>
-            <strong>Text to speech</strong>
-        </div>
-
-        <div>
-            eSpeak
-        </div>
-
-        <button
-            type="button"
-            id="settingsClose"
-        >
-            Close
-        </button>
-
-    </div>
-
-
-    <!-- ==================================================
-         WORLD
-         ================================================== -->
-
-    <div id="world">
-    </div>
-
-
-    <!-- ==================================================
-         TASKBAR
-         ================================================== -->
-
-    <div id="taskbar">
-
-        <button
-            type="button"
-            id="startButton"
-        >
-            Start
-        </button>
-
-        <input
-            type="text"
-            id="messageInput"
-            maxlength="500"
-            autocomplete="off"
-            placeholder="Type a message..."
-        >
-
-    </div>
-
-
-    <!-- ==================================================
-         SPEAK.JS AUDIO OUTPUT
-         
-         speakClient.js creates the HTML5 audio element
-         here after generating the WAV.
-         ================================================== -->
-
-    <div id="audio">
-    </div>
-
-</div>
-
-
-<!-- ======================================================
-     SPEAK.JS
-     
-     According to the original speak.js project,
-     speakClient.js is the script that should be loaded
-     by the page. It loads/uses speakWorker.js, which
-     uses speakGenerator.js.
-     ====================================================== -->
-
-<script
-    type="text/javascript"
-    src="/speakClient.js"
-></script>
-
-
-<!-- ======================================================
-     CHAT CLIENT
-     ====================================================== -->
-
-<script
-    type="text/javascript"
-    src="/script.js"
-></script>
-
+    <script
+        type="text/javascript"
+        src="/script.js"
+    ></script>
 
 </body>
+
 </html>
