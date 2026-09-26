@@ -1,123 +1,193 @@
 <!DOCTYPE html>
-<html>
+
+<html lang="en">
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
 
-    <title>Chat Desktop</title>
 
-    <link rel="stylesheet" type="text/css" href="/style.css">
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
 
-    <script type="text/javascript" src="/speakGenerator.js"></script>
-    <script type="text/javascript" src="/speakClient.js"></script>
+<title>Chat Desktop</title>
+
+<link
+    rel="stylesheet"
+    type="text/css"
+    href="/style.css"
+>
+
+
 </head>
 
 <body>
+
+
+<!-- ======================================================
+     LOGIN SCREEN
+     ====================================================== -->
 
 <div id="loginScreen">
 
     <div class="loginBox">
 
-        <div class="loginTitle">
+        <h1 class="loginTitle">
             Chat Desktop
-        </div>
+        </h1>
 
-        <div class="loginLabel">
+        <label
+            class="loginLabel"
+            for="nameInput"
+        >
             Name:
-        </div>
+        </label>
 
         <input
             type="text"
             id="nameInput"
-            maxlength="24"
+            maxlength="30"
+            autocomplete="off"
         >
 
-        <div class="loginLabel">
+        <label
+            class="loginLabel"
+            for="roomInput"
+        >
             Room:
-        </div>
+        </label>
 
         <input
             type="text"
             id="roomInput"
             value="default"
-            maxlength="40"
+            maxlength="30"
+            autocomplete="off"
         >
 
-        <input
+        <button
             type="button"
             id="submitButton"
-            value="Enter Chat"
         >
+            Enter
+        </button>
 
-        <div class="readme">
-            <a href="/readme.html">
-                README
-            </a>
-        </div>
+        <a
+            href="/readme.html"
+            id="readmeLink"
+        >
+            README
+        </a>
 
     </div>
 
 </div>
 
 
+<!-- ======================================================
+     DESKTOP
+     ====================================================== -->
+
 <div id="desktop">
 
-    <input
+    <!-- SETTINGS -->
+
+    <button
         type="button"
         id="settingsButton"
-        value="Settings"
     >
+        Settings
+    </button>
 
     <div id="settingsPanel">
 
-        <div class="settingsTitle">
-            Settings
+        <div>
+            <strong>Text to speech</strong>
         </div>
 
-        <div class="settingsText">
-            Text to speech:
-            <strong>eSpeak</strong>
+        <div>
+            eSpeak
         </div>
 
-        <div class="settingsText">
-            Speech is generated locally
-            using the eSpeak JavaScript
-            files.
-        </div>
-
-        <input
+        <button
             type="button"
-            id="closeSettings"
-            value="Close"
+            id="settingsClose"
         >
+            Close
+        </button>
 
     </div>
 
 
-    <div id="world"></div>
+    <!-- ==================================================
+         WORLD
+         ================================================== -->
 
+    <div id="world">
+    </div>
+
+
+    <!-- ==================================================
+         TASKBAR
+         ================================================== -->
 
     <div id="taskbar">
 
-        <input
+        <button
             type="button"
             id="startButton"
-            value="Start"
         >
+            Start
+        </button>
 
         <input
             type="text"
             id="messageInput"
             maxlength="500"
+            autocomplete="off"
+            placeholder="Type a message..."
         >
 
+    </div>
+
+
+    <!-- ==================================================
+         SPEAK.JS AUDIO OUTPUT
+         
+         speakClient.js creates the HTML5 audio element
+         here after generating the WAV.
+         ================================================== -->
+
+    <div id="audio">
     </div>
 
 </div>
 
 
-<script type="text/javascript" src="/speakWorker.js"></script>
-<script type="text/javascript" src="/script.js"></script>
+<!-- ======================================================
+     SPEAK.JS
+     
+     According to the original speak.js project,
+     speakClient.js is the script that should be loaded
+     by the page. It loads/uses speakWorker.js, which
+     uses speakGenerator.js.
+     ====================================================== -->
+
+<script
+    type="text/javascript"
+    src="/speakClient.js"
+></script>
+
+
+<!-- ======================================================
+     CHAT CLIENT
+     ====================================================== -->
+
+<script
+    type="text/javascript"
+    src="/script.js"
+></script>
+
 
 </body>
 </html>
