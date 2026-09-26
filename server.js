@@ -1,17 +1,14 @@
 var http = require("http");
 var fs = require("fs");
 var path = require("path");
-var url = require("url");
 var querystring = require("querystring");
-var crypto = require("crypto");
-var child_process = require("child_process");
 
 var PORT = process.env.PORT || 3000;
 var PUBLIC = path.join(__dirname, "public");
 
 var players = {};
-var rooms = {};
 var clients = {};
+
 var nextClientId = 1;
 
 var COLORS = [
@@ -51,191 +48,510 @@ var COLOR_NAMES = {
     silver: "#c0c0c0"
 };
 
+
+/*
+============================================================
+HELPERS
+============================================================
+*/
+
 function randomColor() {
-    return COLORS[Math.floor(Math.random() * COLORS.length)];
+    return COLORS[
+        Math.floor(
+            Math.random() *
+            COLORS.length
+        )
+    ];
 }
 
-function makeId() {
-    return String(nextClientId++);
-}
+function cleanText(
+    value,
+    max
+) {
+    value =
+        value === undefined ||
+        value === null
+            ? ""
+            : String(value);
 
-function cleanText(value, max) {
-    value = value === undefined || value === null ? "" : String(value);
-    value = value.replace(/[\x00-\x1f\x7f]/g, "");
-    return value.substring(0, max);
+    value =
+        value.replace(
+            /[\x00-\x1f\x7f]/g,
+            ""
+        );
+
+    return value.substring(
+        0,
+        max
+    );
 }
 
 function validRoom(room) {
-    return /^[A-Za-z0-9_\- ]{1,40}$/.test(room);
+    return /^[A-Za-z0-9_\- ]{1,40}$/
+        .test(room);
 }
 
 function validName(name) {
-    return /^[^<>]{1,24}$/.test(name);
+    return /^[^<>]{1,24}$/
+        .test(name);
 }
 
 function validHex(color) {
-    return /^#[0-9a-fA-F]{6}$/.test(color);
+    return /^#[0-9a-fA-F]{6}$/
+        .test(color);
 }
 
 function getColor(value) {
-    value = cleanText(value, 30).toLowerCase();
+    var lower;
 
-    if (COLOR_NAMES[value]) {
-        return COLOR_NAMES[value];
+    value =
+        cleanText(
+            value,
+            30
+        );
+
+    lower =
+        value.toLowerCase();
+
+    if (
+        COLOR_NAMES[lower]
+    ) {
+        return COLOR_NAMES[lower];
     }
 
-    if (validHex(value)) {
+    if (
+        validHex(value)
+    ) {
         return value;
     }
 
     return null;
 }
 
-function sendJSON(res, object, status) {
-    var body = JSON.stringify(object);
 
-    res.writeHead(status || 200, {
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(body),
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "Access-Control-Allow-Origin": "*"
-    });
+/*
+============================================================
+JSON
+============================================================
+*/
+
+function sendJSON(
+    res,
+    object,
+    status
+) {
+    var body;
+
+    if (
+        res.writableEnded ||
+        res.headersSent
+    ) {
+        return;
+    }
+
+    body =
+        JSON.stringify(
+            object
+        );
+
+    res.writeHead(
+        status || 200,
+        {
+            "Content-Type":
+                "application/json; charset=utf-8",
+
+            "Content-Length":
+                Buffer.byteLength(
+                    body
+                ),
+
+            "Cache-Control":
+                "no-cache, no-store, must-revalidate",
+
+            "Pragma":
+                "no-cache",
+
+            "Expires":
+                "0",
+
+            "Access-Control-Allow-Origin":
+                "*"
+        }
+    );
 
     res.end(body);
 }
 
-function parseBody(req, callback) {
+
+/*
+============================================================
+BODY PARSER
+============================================================
+*/
+
+function parseBody(
+    req,
+    callback
+) {
     var data = "";
+    var finished = false;
 
-    req.on("data", function (chunk) {
-        data += chunk;
-
-        if (data.length > 100000) {
-            req.destroy();
+    function finish(result) {
+        if (finished) {
+            return;
         }
-    });
 
-    req.on("end", function () {
-        callback(querystring.parse(data));
-    });
+        finished = true;
+
+        callback(result);
+    }
+
+    req.on(
+        "data",
+        function (chunk) {
+            data += chunk;
+
+            if (
+                data.length >
+                100000
+            ) {
+                try {
+                    req.destroy();
+                } catch (e) {}
+
+                finish({});
+
+                return;
+            }
+        }
+    );
+
+    req.on(
+        "end",
+        function () {
+            finish(
+                querystring.parse(
+                    data
+                )
+            );
+        }
+    );
+
+    req.on(
+        "error",
+        function () {
+            finish({});
+        }
+    );
 }
 
-function broadcast(room, event, data) {
+
+/*
+============================================================
+POLL EVENTS
+============================================================
+*/
+
+function addEvent(
+    client,
+    event,
+    data
+) {
+    if (!client) {
+        return;
+    }
+
+    client.events.push({
+        event: event,
+        data: data
+    });
+
+    if (client.res) {
+        finishPoll(
+            client
+        );
+    }
+}
+
+function broadcast(
+    room,
+    event,
+    data
+) {
     var id;
     var client;
 
     for (id in clients) {
-        if (!clients.hasOwnProperty(id)) {
+        if (
+            !clients.hasOwnProperty(id)
+        ) {
             continue;
         }
 
-        client = clients[id];
+        client =
+            clients[id];
 
-        if (client.room === room) {
-            client.events.push({
-                event: event,
-                data: data
-            });
-
-            if (client.res) {
-                finishPoll(client);
-            }
+        if (
+            client.room ===
+            room
+        ) {
+            addEvent(
+                client,
+                event,
+                data
+            );
         }
     }
 }
 
-function finishPoll(client) {
-    var response;
+function finishPoll(
+    client
+) {
     var res;
+    var events;
 
-    if (!client.res) {
+    if (
+        !client ||
+        !client.res
+    ) {
         return;
     }
 
-    response = {
-        events: client.events
-    };
+    res =
+        client.res;
 
-    res = client.res;
+    client.res =
+        null;
 
-    client.res = null;
-    client.events = [];
+    if (
+        client.pollTimer
+    ) {
+        clearTimeout(
+            client.pollTimer
+        );
 
-    sendJSON(res, response);
-}
+        client.pollTimer =
+            null;
+    }
 
-function pollClient(client, res) {
-    if (!client) {
-        sendJSON(res, {
-            error: "invalid client"
-        }, 400);
+    events =
+        client.events;
 
+    client.events =
+        [];
+
+    if (
+        res.writableEnded ||
+        res.headersSent
+    ) {
         return;
     }
 
-    if (client.events.length) {
-        client.res = res;
-        finishPoll(client);
-        return;
-    }
-
-    client.res = res;
-
-    client.pollTimer = setTimeout(function () {
-        if (client.res === res) {
-            client.res = null;
-
-            sendJSON(res, {
-                events: []
-            });
+    sendJSON(
+        res,
+        {
+            events: events
         }
-    }, 25000);
+    );
 }
 
-function removeClient(client) {
+function pollClient(
+    client,
+    res
+) {
+    var events;
+
+    if (!client) {
+        sendJSON(
+            res,
+            {
+                error:
+                    "invalid client"
+            },
+            400
+        );
+
+        return;
+    }
+
+    client.lastSeen =
+        Date.now();
+
+    if (client.res) {
+        try {
+            if (
+                !client.res.writableEnded
+            ) {
+                client.res.end();
+            }
+        } catch (e) {}
+
+        client.res =
+            null;
+    }
+
+    if (
+        client.events.length >
+        0
+    ) {
+        events =
+            client.events;
+
+        client.events =
+            [];
+
+        sendJSON(
+            res,
+            {
+                events: events
+            }
+        );
+
+        return;
+    }
+
+    client.res =
+        res;
+
+    client.pollTimer =
+        setTimeout(
+            function () {
+                if (
+                    client.res !==
+                    res
+                ) {
+                    return;
+                }
+
+                client.res =
+                    null;
+
+                client.pollTimer =
+                    null;
+
+                if (
+                    !res.writableEnded &&
+                    !res.headersSent
+                ) {
+                    sendJSON(
+                        res,
+                        {
+                            events: []
+                        }
+                    );
+                }
+            },
+            25000
+        );
+}
+
+
+/*
+============================================================
+REMOVE CLIENT
+============================================================
+*/
+
+function removeClient(
+    client
+) {
     var player;
 
     if (!client) {
         return;
     }
 
-    player = players[client.id];
+    player =
+        players[client.id];
 
     if (player) {
-        broadcast(player.room, "playerLeft", {
-            id: player.id
-        });
+        broadcast(
+            player.room,
+            "playerLeft",
+            {
+                id:
+                    player.id
+            }
+        );
 
-        delete players[client.id];
+        delete players[
+            client.id
+        ];
+    }
+
+    if (
+        client.pollTimer
+    ) {
+        clearTimeout(
+            client.pollTimer
+        );
+
+        client.pollTimer =
+            null;
     }
 
     if (client.res) {
         try {
-            client.res.end(JSON.stringify({
-                events: []
-            }));
+            if (
+                !client.res.writableEnded
+            ) {
+                client.res.end();
+            }
         } catch (e) {}
 
-        client.res = null;
+        client.res =
+            null;
     }
 
-    delete clients[client.id];
+    delete clients[
+        client.id
+    ];
 }
 
-function joinClient(name, room) {
-    var id = makeId();
 
-    name = cleanText(name, 24);
-    room = cleanText(room, 40);
+/*
+============================================================
+JOIN
+============================================================
+*/
 
-    if (!name || !validName(name)) {
-        name = "Anonymous";
+function joinClient(
+    name,
+    room
+) {
+    var id;
+
+    id =
+        String(
+            nextClientId++
+        );
+
+    name =
+        cleanText(
+            name,
+            24
+        );
+
+    room =
+        cleanText(
+            room,
+            40
+        );
+
+    if (
+        !name ||
+        !validName(name)
+    ) {
+        name =
+            "Anonymous";
     }
 
-    if (!room || !validRoom(room)) {
-        room = "default";
+    if (
+        !room ||
+        !validRoom(room)
+    ) {
+        room =
+            "default";
     }
 
     clients[id] = {
@@ -243,409 +559,877 @@ function joinClient(name, room) {
         room: room,
         events: [],
         res: null,
-        pollTimer: null
+        pollTimer: null,
+        lastSeen:
+            Date.now()
     };
 
     players[id] = {
         id: id,
+
         name: name,
+
         room: room,
-        x: Math.random() * 90 + 5,
-        y: Math.random() * 80 + 10,
-        color: randomColor(),
-        character: "bonzi"
+
+        x:
+            Math.random() *
+            90 +
+            5,
+
+        y:
+            Math.random() *
+            80 +
+            10,
+
+        color:
+            randomColor(),
+
+        character:
+            "bonzi"
     };
 
     return players[id];
 }
 
-function serveStatic(req, res, pathname) {
+
+/*
+============================================================
+STATIC FILES
+============================================================
+*/
+
+function serveStatic(
+    req,
+    res,
+    pathname
+) {
     var file;
     var ext;
     var types;
 
-    if (pathname === "/") {
-        pathname = "/index.html";
+    if (
+        pathname === "/"
+    ) {
+        pathname =
+            "/index.html";
     }
 
-    pathname = decodeURIComponent(pathname);
+    try {
+        pathname =
+            decodeURIComponent(
+                pathname
+            );
+    } catch (e) {
+        res.writeHead(400);
+        res.end(
+            "Bad Request"
+        );
 
-    if (pathname.indexOf("..") !== -1) {
-        res.writeHead(403);
-        res.end("Forbidden");
         return;
     }
 
-    file = path.join(PUBLIC, pathname);
-    ext = path.extname(file).toLowerCase();
+    if (
+        pathname.indexOf(
+            ".."
+        ) !== -1
+    ) {
+        res.writeHead(403);
+        res.end(
+            "Forbidden"
+        );
+
+        return;
+    }
+
+    file =
+        path.join(
+            PUBLIC,
+            pathname
+        );
+
+    ext =
+        path.extname(
+            file
+        ).toLowerCase();
 
     types = {
-        ".html": "text/html",
-        ".css": "text/css",
-        ".js": "application/javascript",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".gif": "image/gif",
-        ".wav": "audio/wav",
-        ".mp3": "audio/mpeg"
+        ".html":
+            "text/html; charset=utf-8",
+
+        ".css":
+            "text/css; charset=utf-8",
+
+        ".js":
+            "application/javascript; charset=utf-8",
+
+        ".png":
+            "image/png",
+
+        ".jpg":
+            "image/jpeg",
+
+        ".jpeg":
+            "image/jpeg",
+
+        ".gif":
+            "image/gif",
+
+        ".wav":
+            "audio/wav",
+
+        ".mp3":
+            "audio/mpeg",
+
+        ".ico":
+            "image/x-icon"
     };
 
-    fs.readFile(file, function (err, data) {
-        if (err) {
-            res.writeHead(404);
-            res.end("Not Found");
-            return;
-        }
-
-        res.writeHead(200, {
-            "Content-Type": types[ext] || "application/octet-stream",
-            "Cache-Control": "no-cache"
-        });
-
-        res.end(data);
-    });
-}
-
-function generateTTS(text, callback) {
-    var filename;
-    var output;
-    var safeText;
-    var espeak;
-
-    safeText = cleanText(text, 500);
-
-    if (!safeText) {
-        callback(null);
-        return;
-    }
-
-    filename = "tts_" + crypto.randomBytes(8).toString("hex") + ".wav";
-    output = path.join("/tmp", filename);
-
-    espeak = child_process.spawn("espeak", [
-        "-w",
-        output,
-        "-a",
-        "100",
-        "-p",
-        "50",
-        "-s",
-        "175",
-        "-v",
-        "en-us",
-        safeText
-    ]);
-
-    espeak.on("error", function () {
-        callback(null);
-    });
-
-    espeak.on("close", function (code) {
-        if (code !== 0) {
-            callback(null);
-            return;
-        }
-
-        callback("/tts/" + filename);
-    });
-}
-
-function serveTTS(req, res, pathname) {
-    var filename;
-    var file;
-
-    filename = pathname.substring("/tts/".length);
-
-    if (!/^tts_[a-f0-9]+\.wav$/.test(filename)) {
-        res.writeHead(404);
-        res.end();
-        return;
-    }
-
-    file = path.join("/tmp", filename);
-
-    fs.readFile(file, function (err, data) {
-        if (err) {
-            res.writeHead(404);
-            res.end();
-            return;
-        }
-
-        res.writeHead(200, {
-            "Content-Type": "audio/wav",
-            "Content-Length": data.length,
-            "Cache-Control": "public, max-age=3600"
-        });
-
-        res.end(data);
-
-        setTimeout(function () {
-            fs.unlink(file, function () {});
-        }, 60000);
-    });
-}
-
-var server = http.createServer(function (req, res) {
-    var parsed;
-    var pathname;
-    var client;
-    var id;
-
-    parsed = url.parse(req.url, true);
-    pathname = parsed.pathname;
-
-    if (pathname === "/api/join" && req.method === "POST") {
-        parseBody(req, function (body) {
-            var player;
-            var id2;
-            var other;
-
-            player = joinClient(body.name, body.room);
-
-            id2 = player.id;
-
-            for (other in players) {
-                if (
-                    players.hasOwnProperty(other) &&
-                    other !== id2 &&
-                    players[other].room === player.room
-                ) {
-                    clients[id2].events.push({
-                        event: "playerJoined",
-                        data: players[other]
-                    });
-                }
-            }
-
-            sendJSON(res, {
-                id: id2,
-                player: player
-            });
-
-            broadcast(player.room, "playerJoined", player);
-        });
-
-        return;
-    }
-
-    if (pathname === "/api/poll") {
-        id = parsed.query.id;
-        client = clients[id];
-
-        pollClient(client, res);
-        return;
-    }
-
-    if (pathname === "/api/send" && req.method === "POST") {
-        parseBody(req, function (body) {
-            client = clients[body.id];
-
-            if (!client || !players[body.id]) {
-                sendJSON(res, {
-                    error: "invalid client"
-                }, 400);
-
-                return;
-            }
-
-            var message = cleanText(body.message, 500);
-
-            if (!message) {
-                sendJSON(res, {
-                    ok: true
-                });
-
-                return;
-            }
-
-            if (message.indexOf("/color ") === 0) {
-                var requestedColor = message.substring(7);
-                var color = getColor(requestedColor);
-
-                if (!color) {
-                    broadcast(client.room, "systemMessage", {
-                        text: "Invalid color."
-                    });
-                } else {
-                    players[client.id].color = color;
-
-                    broadcast(client.room, "playerColorChanged", {
-                        id: client.id,
-                        color: color
-                    });
-                }
-
-                sendJSON(res, { ok: true });
-                return;
-            }
-
-            if (message === "/color") {
-                players[client.id].color = randomColor();
-
-                broadcast(client.room, "playerColorChanged", {
-                    id: client.id,
-                    color: players[client.id].color
-                });
-
-                sendJSON(res, { ok: true });
-                return;
-            }
-
-            if (message === "/char bonzi" || message === "/char square") {
-                players[client.id].character =
-                    message.substring(6) === "square" ? "square" : "bonzi";
-
-                broadcast(client.room, "playerCharacterChanged", {
-                    id: client.id,
-                    character: players[client.id].character
-                });
-
-                sendJSON(res, { ok: true });
-                return;
-            }
-
-            if (message === "/char") {
-                players[client.id].character =
-                    players[client.id].character === "bonzi"
-                        ? "square"
-                        : "bonzi";
-
-                broadcast(client.room, "playerCharacterChanged", {
-                    id: client.id,
-                    character: players[client.id].character
-                });
-
-                sendJSON(res, { ok: true });
-                return;
-            }
-
-            broadcast(client.room, "message", {
-                id: client.id,
-                text: message
-            });
-
-            sendJSON(res, { ok: true });
-        });
-
-        return;
-    }
-
-    if (pathname === "/api/move" && req.method === "POST") {
-        parseBody(req, function (body) {
-            var sender;
-            var target;
-            var x;
-            var y;
-
-            sender = clients[body.senderId];
-
-            if (!sender) {
-                sendJSON(res, {
-                    error: "invalid sender"
-                }, 400);
-
-                return;
-            }
-
-            target = players[String(body.playerId)];
-
-            if (!target || target.room !== sender.room) {
-                sendJSON(res, {
-                    error: "invalid target"
-                }, 400);
-
-                return;
-            }
-
-            x = parseFloat(body.x);
-            y = parseFloat(body.y);
-
-            if (isNaN(x) || isNaN(y)) {
-                sendJSON(res, {
-                    error: "invalid position"
-                }, 400);
-
-                return;
-            }
-
-            x = Math.max(2, Math.min(98, x));
-            y = Math.max(2, Math.min(98, y));
-
-            target.x = x;
-            target.y = y;
-
-            broadcast(target.room, "playerMoved", {
-                id: target.id,
-                x: x,
-                y: y
-            });
-
-            sendJSON(res, {
-                ok: true
-            });
-        });
-
-        return;
-    }
-
-    if (pathname === "/api/leave" && req.method === "POST") {
-        parseBody(req, function (body) {
-            client = clients[body.id];
-
-            if (client) {
-                removeClient(client);
-            }
-
-            sendJSON(res, {
-                ok: true
-            });
-        });
-
-        return;
-    }
-
-    if (pathname.indexOf("/tts/") === 0) {
-        serveTTS(req, res, pathname);
-        return;
-    }
-
-    if (pathname === "/api/tts" && req.method === "GET") {
-        generateTTS(parsed.query.text || "", function (result) {
-            if (!result) {
-                sendJSON(res, {
-                    error: "TTS unavailable"
-                }, 503);
-
-                return;
-            }
-
-            sendJSON(res, {
-                url: result
-            });
-        });
-
-        return;
-    }
-
-    serveStatic(req, res, pathname);
-});
-
-setInterval(function () {
-    var id;
-    var now = Date.now();
-
-    for (id in clients) {
-        if (
-            clients.hasOwnProperty(id) &&
-            clients[id].lastSeen &&
-            now - clients[id].lastSeen > 120000
+    fs.readFile(
+        file,
+        function (
+            err,
+            data
         ) {
-            removeClient(clients[id]);
-        }
-    }
-}, 30000);
+            if (err) {
+                if (
+                    !res.writableEnded &&
+                    !res.headersSent
+                ) {
+                    res.writeHead(
+                        404
+                    );
 
-server.listen(PORT, "0.0.0.0", function () {
-    console.log("Legacy chat server listening on port " + PORT);
-});
+                    res.end(
+                        "Not Found"
+                    );
+                }
+
+                return;
+            }
+
+            if (
+                res.writableEnded ||
+                res.headersSent
+            ) {
+                return;
+            }
+
+            res.writeHead(
+                200,
+                {
+                    "Content-Type":
+                        types[ext] ||
+                        "application/octet-stream",
+
+                    "Content-Length":
+                        data.length,
+
+                    "Cache-Control":
+                        "no-cache"
+                }
+            );
+
+            res.end(data);
+        }
+    );
+}
+
+
+/*
+============================================================
+SERVER
+============================================================
+*/
+
+var server =
+    http.createServer(
+        function (
+            req,
+            res
+        ) {
+            var requestUrl;
+            var pathname;
+            var id;
+            var client;
+
+            try {
+                requestUrl =
+                    new URL(
+                        req.url,
+                        "http://" +
+                        (
+                            req.headers.host ||
+                            "localhost"
+                        )
+                    );
+            } catch (e) {
+                res.writeHead(
+                    400
+                );
+
+                res.end(
+                    "Bad Request"
+                );
+
+                return;
+            }
+
+            pathname =
+                requestUrl.pathname;
+
+
+            /*
+             * JOIN
+             */
+
+            if (
+                pathname ===
+                "/api/join" &&
+                req.method ===
+                "POST"
+            ) {
+                parseBody(
+                    req,
+                    function (
+                        body
+                    ) {
+                        var player;
+                        var otherId;
+                        var existing;
+
+                        player =
+                            joinClient(
+                                body.name,
+                                body.room
+                            );
+
+                        for (
+                            otherId in
+                            players
+                        ) {
+                            if (
+                                !players
+                                    .hasOwnProperty(
+                                        otherId
+                                    )
+                            ) {
+                                continue;
+                            }
+
+                            existing =
+                                players[
+                                    otherId
+                                ];
+
+                            if (
+                                otherId !==
+                                player.id &&
+                                existing.room ===
+                                player.room
+                            ) {
+                                clients[
+                                    player.id
+                                ].events.push({
+                                    event:
+                                        "playerJoined",
+
+                                    data:
+                                        existing
+                                });
+                            }
+                        }
+
+                        sendJSON(
+                            res,
+                            {
+                                id:
+                                    player.id,
+
+                                player:
+                                    player,
+
+                                events:
+                                    clients[
+                                        player.id
+                                    ].events
+                            }
+                        );
+
+                        clients[
+                            player.id
+                        ].events =
+                            [];
+
+                        broadcast(
+                            player.room,
+                            "playerJoined",
+                            player
+                        );
+                    }
+                );
+
+                return;
+            }
+
+
+            /*
+             * POLL
+             */
+
+            if (
+                pathname ===
+                "/api/poll" &&
+                req.method ===
+                "GET"
+            ) {
+                id =
+                    requestUrl
+                        .searchParams
+                        .get("id");
+
+                client =
+                    clients[id];
+
+                pollClient(
+                    client,
+                    res
+                );
+
+                return;
+            }
+
+
+            /*
+             * SEND
+             */
+
+            if (
+                pathname ===
+                "/api/send" &&
+                req.method ===
+                "POST"
+            ) {
+                parseBody(
+                    req,
+                    function (
+                        body
+                    ) {
+                        var message;
+                        var color;
+
+                        client =
+                            clients[
+                                String(
+                                    body.id
+                                )
+                            ];
+
+                        if (
+                            !client ||
+                            !players[
+                                client.id
+                            ]
+                        ) {
+                            sendJSON(
+                                res,
+                                {
+                                    error:
+                                        "invalid client"
+                                },
+                                400
+                            );
+
+                            return;
+                        }
+
+                        client.lastSeen =
+                            Date.now();
+
+                        message =
+                            cleanText(
+                                body.message,
+                                500
+                            );
+
+                        if (!message) {
+                            sendJSON(
+                                res,
+                                {
+                                    ok: true
+                                }
+                            );
+
+                            return;
+                        }
+
+
+                        /*
+                         * /color
+                         */
+
+                        if (
+                            message.indexOf(
+                                "/color "
+                            ) === 0
+                        ) {
+                            color =
+                                getColor(
+                                    message.substring(
+                                        7
+                                    )
+                                );
+
+                            if (!color) {
+                                broadcast(
+                                    client.room,
+                                    "systemMessage",
+                                    {
+                                        text:
+                                            "Invalid color."
+                                    }
+                                );
+                            } else {
+                                players[
+                                    client.id
+                                ].color =
+                                    color;
+
+                                broadcast(
+                                    client.room,
+                                    "playerColorChanged",
+                                    {
+                                        id:
+                                            client.id,
+
+                                        color:
+                                            color
+                                    }
+                                );
+                            }
+
+                            sendJSON(
+                                res,
+                                {
+                                    ok: true
+                                }
+                            );
+
+                            return;
+                        }
+
+
+                        /*
+                         * Random color
+                         */
+
+                        if (
+                            message ===
+                            "/color"
+                        ) {
+                            players[
+                                client.id
+                            ].color =
+                                randomColor();
+
+                            broadcast(
+                                client.room,
+                                "playerColorChanged",
+                                {
+                                    id:
+                                        client.id,
+
+                                    color:
+                                        players[
+                                            client.id
+                                        ].color
+                                }
+                            );
+
+                            sendJSON(
+                                res,
+                                {
+                                    ok: true
+                                }
+                            );
+
+                            return;
+                        }
+
+
+                        /*
+                         * Character
+                         */
+
+                        if (
+                            message ===
+                            "/char bonzi" ||
+                            message ===
+                            "/char square"
+                        ) {
+                            players[
+                                client.id
+                            ].character =
+                                message.substring(
+                                    6
+                                ) ===
+                                "square"
+                                    ? "square"
+                                    : "bonzi";
+
+                            broadcast(
+                                client.room,
+                                "playerCharacterChanged",
+                                {
+                                    id:
+                                        client.id,
+
+                                    character:
+                                        players[
+                                            client.id
+                                        ].character
+                                }
+                            );
+
+                            sendJSON(
+                                res,
+                                {
+                                    ok: true
+                                }
+                            );
+
+                            return;
+                        }
+
+
+                        /*
+                         * Toggle
+                         */
+
+                        if (
+                            message ===
+                            "/char"
+                        ) {
+                            players[
+                                client.id
+                            ].character =
+                                players[
+                                    client.id
+                                ].character ===
+                                "bonzi"
+                                    ? "square"
+                                    : "bonzi";
+
+                            broadcast(
+                                client.room,
+                                "playerCharacterChanged",
+                                {
+                                    id:
+                                        client.id,
+
+                                    character:
+                                        players[
+                                            client.id
+                                        ].character
+                                }
+                            );
+
+                            sendJSON(
+                                res,
+                                {
+                                    ok: true
+                                }
+                            );
+
+                            return;
+                        }
+
+
+                        /*
+                         * Normal message
+                         */
+
+                        broadcast(
+                            client.room,
+                            "message",
+                            {
+                                id:
+                                    client.id,
+
+                                text:
+                                    message
+                            }
+                        );
+
+                        sendJSON(
+                            res,
+                            {
+                                ok: true
+                            }
+                        );
+                    }
+                );
+
+                return;
+            }
+
+
+            /*
+             * MOVE
+             */
+
+            if (
+                pathname ===
+                "/api/move" &&
+                req.method ===
+                "POST"
+            ) {
+                parseBody(
+                    req,
+                    function (
+                        body
+                    ) {
+                        var sender;
+                        var target;
+                        var x;
+                        var y;
+
+                        sender =
+                            clients[
+                                String(
+                                    body.senderId
+                                )
+                            ];
+
+                        if (!sender) {
+                            sendJSON(
+                                res,
+                                {
+                                    error:
+                                        "invalid sender"
+                                },
+                                400
+                            );
+
+                            return;
+                        }
+
+                        sender.lastSeen =
+                            Date.now();
+
+                        target =
+                            players[
+                                String(
+                                    body.playerId
+                                )
+                            ];
+
+                        if (
+                            !target ||
+                            target.room !==
+                            sender.room
+                        ) {
+                            sendJSON(
+                                res,
+                                {
+                                    error:
+                                        "invalid target"
+                                },
+                                400
+                            );
+
+                            return;
+                        }
+
+                        x =
+                            parseFloat(
+                                body.x
+                            );
+
+                        y =
+                            parseFloat(
+                                body.y
+                            );
+
+                        if (
+                            isNaN(x) ||
+                            isNaN(y)
+                        ) {
+                            sendJSON(
+                                res,
+                                {
+                                    error:
+                                        "invalid position"
+                                },
+                                400
+                            );
+
+                            return;
+                        }
+
+                        x =
+                            Math.max(
+                                2,
+                                Math.min(
+                                    98,
+                                    x
+                                )
+                            );
+
+                        y =
+                            Math.max(
+                                2,
+                                Math.min(
+                                    98,
+                                    y
+                                )
+                            );
+
+                        target.x =
+                            x;
+
+                        target.y =
+                            y;
+
+                        broadcast(
+                            target.room,
+                            "playerMoved",
+                            {
+                                id:
+                                    target.id,
+
+                                x:
+                                    x,
+
+                                y:
+                                    y
+                            }
+                        );
+
+                        sendJSON(
+                            res,
+                            {
+                                ok: true
+                            }
+                        );
+                    }
+                );
+
+                return;
+            }
+
+
+            /*
+             * LEAVE
+             */
+
+            if (
+                pathname ===
+                "/api/leave" &&
+                req.method ===
+                "POST"
+            ) {
+                parseBody(
+                    req,
+                    function (
+                        body
+                    ) {
+                        client =
+                            clients[
+                                String(
+                                    body.id
+                                )
+                            ];
+
+                        if (client) {
+                            removeClient(
+                                client
+                            );
+                        }
+
+                        sendJSON(
+                            res,
+                            {
+                                ok: true
+                            }
+                        );
+                    }
+                );
+
+                return;
+            }
+
+
+            /*
+             * STATIC
+             */
+
+            serveStatic(
+                req,
+                res,
+                pathname
+            );
+        }
+    );
+
+
+/*
+============================================================
+CLEANUP
+============================================================
+*/
+
+setInterval(
+    function () {
+        var id;
+        var client;
+        var now;
+
+        now =
+            Date.now();
+
+        for (
+            id in clients
+        ) {
+            if (
+                !clients.hasOwnProperty(
+                    id
+                )
+            ) {
+                continue;
+            }
+
+            client =
+                clients[id];
+
+            if (
+                client.lastSeen &&
+                now -
+                    client.lastSeen >
+                    120000
+            ) {
+                removeClient(
+                    client
+                );
+            }
+        }
+    },
+    30000
+);
+
+
+/*
+============================================================
+START
+============================================================
+*/
+
+server.listen(
+    PORT,
+    "0.0.0.0",
+    function () {
+        console.log(
+            "Legacy chat server listening on port " +
+            PORT
+        );
+    }
+);
