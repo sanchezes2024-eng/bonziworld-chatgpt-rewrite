@@ -6,10 +6,9 @@ const querystring = require("querystring");
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, "public");
 
-const players = {};
-const clients = {};
-
-let nextClientId = 1;
+var players = {};
+var clients = {};
+var nextClientId = 1;
 
 
 /*
@@ -18,7 +17,7 @@ COLORS
 ============================================================
 */
 
-const colorPalette = [
+var colorPalette = [
     "#ff0000",
     "#00ff00",
     "#0000ff",
@@ -34,7 +33,7 @@ const colorPalette = [
     "#ffffff"
 ];
 
-const namedColors = {
+var namedColors = {
     red: "#ff0000",
     green: "#00ff00",
     blue: "#0000ff",
@@ -63,12 +62,10 @@ function randomColor() {
 
 function getColor(value) {
     if (!value) {
-        return null;
+        return randomColor();
     }
 
-    value = String(value)
-        .toLowerCase()
-        .replace(/^\s+|\s+$/g, "");
+    value = String(value).toLowerCase();
 
     if (namedColors[value]) {
         return namedColors[value];
@@ -89,15 +86,10 @@ VALIDATION
 */
 
 function cleanText(value) {
-    if (value === undefined || value === null) {
-        return "";
-    }
-
-    return String(value)
-        .replace(/[\r\n]+/g, " ")
+    return String(value || "")
+        .replace(/[\r\n\t]+/g, " ")
         .replace(/\s+/g, " ")
-        .replace(/^\s+|\s+$/g, "")
-        .substring(0, 500);
+        .trim();
 }
 
 function validName(value) {
@@ -123,16 +115,16 @@ function validRoom(value) {
 function clamp(value, min, max) {
     value = Number(value);
 
-    if (!isFinite(value)) {
-        return min;
+    if (isNaN(value)) {
+        value = min;
     }
 
     if (value < min) {
-        return min;
+        value = min;
     }
 
     if (value > max) {
-        return max;
+        value = max;
     }
 
     return value;
@@ -141,7 +133,7 @@ function clamp(value, min, max) {
 
 /*
 ============================================================
-JSON RESPONSE
+HTTP HELPERS
 ============================================================
 */
 
@@ -150,130 +142,141 @@ function sendJSON(res, status, data) {
         return;
     }
 
-    const output = JSON.stringify(data);
+    var body = JSON.stringify(data);
 
     res.writeHead(status, {
-        "Content-Type": "application/json; charset=utf-8",
+        "Content-Type": "application/json",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Pragma": "no-cache",
-        "Access-Control-Allow-Origin": "*"
+        "Expires": "0",
+        "Content-Length": Buffer.byteLength(body)
     });
 
-    res.end(output);
+    res.end(body);
 }
 
-
-/*
-============================================================
-POST BODY
-============================================================
-*/
-
 function parseBody(req, callback) {
-    let body = "";
-    let finished = false;
+    var body = "";
+    var finished = false;
 
-    function finish() {
+    function done(result) {
         if (finished) {
             return;
         }
 
         finished = true;
-
-        try {
-            callback(querystring.parse(body));
-        } catch (e) {
-            callback({});
-        }
+        callback(result);
     }
 
-    req.on("data", function (chunk) {
+    req.on("data", function(chunk) {
+        body += chunk.toString();
+
+        if (body.length > 100000) {
+            done(null);
+
+            try {
+                req.destroy();
+            } catch (e) {}
+
+            return;
+        }
+    });
+
+    req.on("end", function() {
         if (finished) {
             return;
         }
 
-        body += chunk.toString();
-
-        if (body.length > 100000) {
-            finished = true;
-            req.destroy();
+        try {
+            done(querystring.parse(body));
+        } catch (e) {
+            done(null);
         }
     });
 
-    req.on("end", finish);
-
-    req.on("error", function () {
-        finish();
+    req.on("error", function() {
+        done(null);
     });
 }
 
 
 /*
 ============================================================
-EVENT QUEUES
+EVENT SYSTEM
 ============================================================
 */
 
-function addEvent(clientId, event) {
-    const client = clients[clientId];
-
+function addEvent(client, event) {
     if (!client) {
         return;
     }
 
     client.events.push(event);
 
-    if (client.pendingResponse) {
+    if (client.pollResponse) {
         finishPoll(client);
     }
 }
 
 function broadcast(room, event, exceptClientId) {
-    let id;
+    var id;
 
     for (id in clients) {
-        if (!Object.prototype.hasOwnProperty.call(clients, id)) {
+        if (!clients.hasOwnProperty(id)) {
             continue;
         }
 
-        const client = clients[id];
+        var client = clients[id];
 
-        if (
-            client.room === room &&
-            id !== exceptClientId
-        ) {
-            addEvent(id, event);
+        if (!client.player) {
+            continue;
         }
+
+        if (client.player.room !== room) {
+            continue;
+        }
+
+        if (exceptClientId && client.id === exceptClientId) {
+            continue;
+        }
+
+        addEvent(client, event);
     }
 }
 
+
+/*
+============================================================
+LONG POLLING
+============================================================
+*/
+
 function finishPoll(client) {
-    if (!client.pendingResponse) {
+    if (!client) {
         return;
     }
 
-    const response = client.pendingResponse;
+    var res = client.pollResponse;
 
-    client.pendingResponse = null;
+    if (!res) {
+        return;
+    }
+
+    client.pollResponse = null;
 
     if (client.pollTimer) {
         clearTimeout(client.pollTimer);
         client.pollTimer = null;
     }
 
-    if (
-        response.writableEnded ||
-        response.headersSent
-    ) {
+    if (res.writableEnded || res.destroyed) {
         return;
     }
 
-    const events = client.events.splice(
-        0,
-        client.events.length
-    );
+    var events = client.events.slice(0);
+    client.events = [];
 
-    sendJSON(response, 200, {
+    sendJSON(res, 200, {
         events: events
     });
 }
@@ -281,49 +284,67 @@ function finishPoll(client) {
 
 /*
 ============================================================
-REMOVE CLIENT
+DISCONNECT / REMOVE CLIENT
 ============================================================
 */
 
 function removeClient(clientId) {
-    const client = clients[clientId];
+    var client = clients[clientId];
 
     if (!client) {
         return;
     }
+
+    /*
+    Prevent this from running twice.
+    */
+    if (client.removed) {
+        return;
+    }
+
+    client.removed = true;
 
     if (client.pollTimer) {
         clearTimeout(client.pollTimer);
         client.pollTimer = null;
     }
 
-    if (client.pendingResponse) {
-        const response = client.pendingResponse;
+    /*
+    Close any pending long-poll request.
+    */
+    if (client.pollResponse) {
+        var oldResponse = client.pollResponse;
+        client.pollResponse = null;
 
-        client.pendingResponse = null;
-
-        if (!response.writableEnded) {
-            response.end(
-                JSON.stringify({
-                    events: []
-                })
-            );
+        if (!oldResponse.writableEnded) {
+            try {
+                oldResponse.end();
+            } catch (e) {}
         }
     }
 
-    const player = players[client.playerId];
+    var player = client.player;
 
-    if (player) {
+    /*
+    IMPORTANT:
+    Delete the player BEFORE broadcasting so it can no longer
+    be considered an active player.
+    */
+    if (player && players[player.id]) {
+        delete players[player.id];
+
+        /*
+        Tell every remaining player in the room that this
+        character has disappeared.
+        */
         broadcast(
             player.room,
             {
                 type: "playerLeft",
                 playerId: player.id
             },
-            clientId
+            client.id
         );
-
-        delete players[player.id];
     }
 
     delete clients[clientId];
@@ -337,10 +358,10 @@ JOIN
 */
 
 function joinClient(name, room) {
-    const id = String(nextClientId++);
+    var clientId = String(nextClientId++);
 
-    const player = {
-        id: id,
+    var player = {
+        id: clientId,
         name: validName(name),
         room: validRoom(room),
         x: Math.random() * 90 + 5,
@@ -349,23 +370,56 @@ function joinClient(name, room) {
         character: "bonzi"
     };
 
-    const client = {
-        id: id,
-        playerId: id,
-        room: player.room,
+    var client = {
+        id: clientId,
+        player: player,
         events: [],
-        pendingResponse: null,
+        pollResponse: null,
         pollTimer: null,
-        lastSeen: Date.now()
+        removed: false,
+        lastActivity: Date.now()
     };
 
-    players[id] = player;
-    clients[id] = client;
+    players[player.id] = player;
+    clients[client.id] = client;
 
-    return {
-        client: client,
-        player: player
-    };
+    /*
+    Send all existing players in this room to the new client.
+    */
+    var id;
+
+    for (id in players) {
+        if (!players.hasOwnProperty(id)) {
+            continue;
+        }
+
+        if (id === player.id) {
+            continue;
+        }
+
+        if (players[id].room !== player.room) {
+            continue;
+        }
+
+        client.events.push({
+            type: "playerJoined",
+            player: players[id]
+        });
+    }
+
+    /*
+    Tell everyone else about the new player.
+    */
+    broadcast(
+        player.room,
+        {
+            type: "playerJoined",
+            player: player
+        },
+        client.id
+    );
+
+    return client;
 }
 
 
@@ -375,168 +429,154 @@ STATIC FILES
 ============================================================
 */
 
-const mimeTypes = {
-    ".html": "text/html; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".js": "application/javascript; charset=utf-8",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".wav": "audio/wav",
-    ".mp3": "audio/mpeg",
-    ".ico": "image/x-icon"
-};
+function getContentType(filePath) {
+    var ext = path.extname(filePath).toLowerCase();
 
-function serveFile(req, res, pathname) {
-    if (pathname === "/") {
-        pathname = "/index.html";
+    var types = {
+        ".html": "text/html; charset=utf-8",
+        ".css": "text/css; charset=utf-8",
+        ".js": "application/javascript; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".ico": "image/x-icon",
+        ".wav": "audio/wav",
+        ".mp3": "audio/mpeg"
+    };
+
+    return types[ext] || "application/octet-stream";
+}
+
+function serveStatic(req, res) {
+    var requestPath = req.url.split("?")[0];
+
+    if (requestPath === "/") {
+        requestPath = "/index.html";
     }
 
+    try {
+        requestPath = decodeURIComponent(requestPath);
+    } catch (e) {
+        sendJSON(res, 400, {
+            error: "Bad URL"
+        });
+        return;
+    }
+
+    /*
+    Security: never allow paths outside public/.
+    */
     if (
-        pathname.indexOf("..") !== -1 ||
-        pathname.indexOf("\\") !== -1
+        requestPath.indexOf("..") !== -1 ||
+        requestPath.indexOf("\\") !== -1
     ) {
         sendJSON(res, 403, {
             error: "Forbidden"
         });
-
         return;
     }
 
-    const filePath = path.join(
+    var filePath = path.join(
         PUBLIC_DIR,
-        pathname.substring(1)
+        requestPath
     );
 
     if (
-        filePath.indexOf(PUBLIC_DIR) !== 0
+        filePath !== PUBLIC_DIR &&
+        filePath.indexOf(PUBLIC_DIR + path.sep) !== 0
     ) {
         sendJSON(res, 403, {
             error: "Forbidden"
         });
-
         return;
     }
 
-    fs.readFile(
-        filePath,
-        function (error, data) {
-            if (error) {
-                sendJSON(res, 404, {
-                    error: "Not found"
+    fs.stat(filePath, function(err, stat) {
+        if (err || !stat.isFile()) {
+            sendJSON(res, 404, {
+                error: "Not found"
+            });
+            return;
+        }
+
+        fs.readFile(filePath, function(readErr, data) {
+            if (readErr) {
+                sendJSON(res, 500, {
+                    error: "Could not read file"
                 });
-
                 return;
             }
 
-            if (
-                res.writableEnded ||
-                res.headersSent
-            ) {
+            if (res.writableEnded || res.headersSent) {
                 return;
             }
-
-            const ext = path.extname(filePath).toLowerCase();
 
             res.writeHead(200, {
-                "Content-Type":
-                    mimeTypes[ext] ||
-                    "application/octet-stream",
-
+                "Content-Type": getContentType(filePath),
                 "Cache-Control": "no-cache"
             });
 
             res.end(data);
-        }
-    );
+        });
+    });
 }
 
 
 /*
 ============================================================
-HTTP SERVER
+SERVER
 ============================================================
 */
 
-const server = http.createServer(function (req, res) {
-    let parsed;
+var server = http.createServer(function(req, res) {
+    var parsed;
 
     try {
         parsed = new URL(
             req.url,
-            "http://" +
-            (req.headers.host || "localhost")
+            "http://" + (req.headers.host || "localhost")
         );
     } catch (e) {
         sendJSON(res, 400, {
             error: "Bad request"
         });
-
         return;
     }
 
-    const pathname = parsed.pathname;
-
-
     /*
-    ========================================================
+    --------------------------------------------------------
     JOIN
-    ========================================================
+    --------------------------------------------------------
     */
 
     if (
-        pathname === "/api/join" &&
-        req.method === "POST"
+        req.method === "POST" &&
+        parsed.pathname === "/api/join"
     ) {
-        parseBody(req, function (body) {
-            const result = joinClient(
+        parseBody(req, function(body) {
+            if (!body) {
+                sendJSON(res, 400, {
+                    error: "Invalid request"
+                });
+                return;
+            }
+
+            var client = joinClient(
                 body.name,
                 body.room
             );
 
-            const client = result.client;
-            const player = result.player;
-
-            let id;
-
-            for (id in players) {
-                if (!Object.prototype.hasOwnProperty.call(players, id)) {
-                    continue;
-                }
-
-                if (id === player.id) {
-                    continue;
-                }
-
-                if (
-                    players[id].room ===
-                    player.room
-                ) {
-                    client.events.push({
-                        type: "playerJoined",
-                        player: players[id]
-                    });
-                }
-            }
-
-            broadcast(
-                player.room,
-                {
-                    type: "playerJoined",
-                    player: player
-                },
-                client.id
-            );
+            client.lastActivity = Date.now();
 
             sendJSON(res, 200, {
                 id: client.id,
-                player: player,
-                events: client.events.splice(
-                    0,
-                    client.events.length
-                )
+                player: client.player,
+                events: client.events
             });
+
+            client.events = [];
         });
 
         return;
@@ -544,152 +584,139 @@ const server = http.createServer(function (req, res) {
 
 
     /*
-    ========================================================
+    --------------------------------------------------------
     POLL
-    ========================================================
+    --------------------------------------------------------
     */
 
     if (
-        pathname === "/api/poll" &&
-        req.method === "GET"
+        req.method === "GET" &&
+        parsed.pathname === "/api/poll"
     ) {
-        const id = parsed.searchParams.get("id");
-        const client = clients[id];
+        var pollId = parsed.searchParams.get("id");
+        var pollClient = clients[pollId];
 
-        if (!client) {
-            sendJSON(res, 400, {
-                error: "Invalid client"
+        if (!pollClient || pollClient.removed) {
+            sendJSON(res, 404, {
+                error: "Client not found"
             });
-
             return;
         }
 
-        client.lastSeen = Date.now();
+        pollClient.lastActivity = Date.now();
 
-        if (client.pendingResponse) {
-            const oldResponse = client.pendingResponse;
-
-            client.pendingResponse = null;
-
-            if (client.pollTimer) {
-                clearTimeout(client.pollTimer);
-                client.pollTimer = null;
-            }
-
-            if (!oldResponse.writableEnded) {
-                oldResponse.end(
-                    JSON.stringify({
-                        events: []
-                    })
-                );
-            }
-        }
-
-        if (client.events.length > 0) {
-            sendJSON(res, 200, {
-                events: client.events.splice(
-                    0,
-                    client.events.length
-                )
-            });
-
+        /*
+        If events are already waiting, send immediately.
+        */
+        if (pollClient.events.length > 0) {
+            finishPoll(pollClient);
             return;
         }
 
-        client.pendingResponse = res;
+        /*
+        If the client somehow has an old poll still open,
+        close it first.
+        */
+        if (pollClient.pollResponse) {
+            try {
+                pollClient.pollResponse.end();
+            } catch (e) {}
 
-        client.pollTimer = setTimeout(
-            function () {
-                if (
-                    client.pendingResponse ===
-                    res
-                ) {
-                    client.pendingResponse = null;
-                    client.pollTimer = null;
+            pollClient.pollResponse = null;
+        }
 
-                    if (
-                        !res.writableEnded &&
-                        !res.headersSent
-                    ) {
-                        sendJSON(res, 200, {
-                            events: []
-                        });
-                    }
-                }
-            },
-            25000
-        );
+        pollClient.pollResponse = res;
+
+        /*
+        Long poll timeout.
+        */
+        pollClient.pollTimer = setTimeout(function() {
+            if (!pollClient || pollClient.removed) {
+                return;
+            }
+
+            finishPoll(pollClient);
+        }, 25000);
+
+        /*
+        VERY IMPORTANT:
+        If the browser closes its tab, the HTTP request
+        eventually emits "close". Remove the player
+        immediately instead of waiting for the 120-second
+        cleanup timer.
+        */
+        req.on("close", function() {
+            /*
+            Only remove the client if this request is still
+            the client's active poll request.
+
+            This prevents an old poll request from removing
+            a client after it has already started another one.
+            */
+            if (
+                pollClient &&
+                pollClient.pollResponse === res
+            ) {
+                removeClient(pollClient.id);
+            }
+        });
 
         return;
     }
 
 
     /*
-    ========================================================
-    SEND MESSAGE
-    ========================================================
+    --------------------------------------------------------
+    SEND MESSAGE / COMMAND
+    --------------------------------------------------------
     */
 
     if (
-        pathname === "/api/send" &&
-        req.method === "POST"
+        req.method === "POST" &&
+        parsed.pathname === "/api/send"
     ) {
-        parseBody(req, function (body) {
-            const client = clients[body.id];
-
-            if (!client) {
+        parseBody(req, function(body) {
+            if (!body) {
                 sendJSON(res, 400, {
-                    error: "Invalid client"
+                    error: "Invalid request"
                 });
-
                 return;
             }
 
-            client.lastSeen = Date.now();
+            var client = clients[String(body.id)];
 
-            const player = players[client.playerId];
-
-            if (!player) {
-                sendJSON(res, 400, {
-                    error: "Player not found"
+            if (!client || client.removed || !client.player) {
+                sendJSON(res, 404, {
+                    error: "Client not found"
                 });
-
                 return;
             }
 
-            const text = cleanText(body.text);
+            client.lastActivity = Date.now();
+
+            var text = cleanText(body.text);
 
             if (!text) {
-                sendJSON(res, 400, {
-                    error: "Empty message"
+                sendJSON(res, 200, {
+                    ok: true
                 });
-
                 return;
             }
 
-
             /*
-            ------------------------------------------------
             /color
-            ------------------------------------------------
             */
+            if (text === "/color") {
+                var newRandomColor = randomColor();
 
-            if (
-                text.toLowerCase() === "/color"
-            ) {
-                const color = randomColor();
-
-                player.color = color;
+                client.player.color = newRandomColor;
 
                 broadcast(
-                    player.room,
+                    client.player.room,
                     {
-                        type:
-                            "playerColorChanged",
-                        playerId:
-                            player.id,
-                        color:
-                            color
+                        type: "playerColorChanged",
+                        playerId: client.player.id,
+                        color: newRandomColor
                     }
                 );
 
@@ -700,31 +727,22 @@ const server = http.createServer(function (req, res) {
                 return;
             }
 
-
             /*
-            ------------------------------------------------
-            /color NAME
-            ------------------------------------------------
+            /color red
+            /color #ff0000
             */
-
-            if (
-                text.toLowerCase()
-                    .indexOf("/color ") === 0
-            ) {
-                const color = getColor(
+            if (text.indexOf("/color ") === 0) {
+                var colorValue = cleanText(
                     text.substring(7)
                 );
 
-                if (!color) {
-                    addEvent(
-                        client.id,
-                        {
-                            type:
-                                "systemMessage",
-                            text:
-                                "Invalid color."
-                        }
-                    );
+                var newColor = getColor(colorValue);
+
+                if (!newColor) {
+                    addEvent(client, {
+                        type: "systemMessage",
+                        text: "Invalid color."
+                    });
 
                     sendJSON(res, 200, {
                         ok: true
@@ -733,17 +751,14 @@ const server = http.createServer(function (req, res) {
                     return;
                 }
 
-                player.color = color;
+                client.player.color = newColor;
 
                 broadcast(
-                    player.room,
+                    client.player.room,
                     {
-                        type:
-                            "playerColorChanged",
-                        playerId:
-                            player.id,
-                        color:
-                            color
+                        type: "playerColorChanged",
+                        playerId: client.player.id,
+                        color: newColor
                     }
                 );
 
@@ -754,30 +769,23 @@ const server = http.createServer(function (req, res) {
                 return;
             }
 
-
             /*
-            ------------------------------------------------
             /char
-            ------------------------------------------------
             */
-
-            if (
-                text.toLowerCase() === "/char"
-            ) {
-                player.character =
-                    player.character === "bonzi"
+            if (text === "/char") {
+                var newCharacter =
+                    client.player.character === "bonzi"
                         ? "square"
                         : "bonzi";
 
+                client.player.character = newCharacter;
+
                 broadcast(
-                    player.room,
+                    client.player.room,
                     {
-                        type:
-                            "playerCharacterChanged",
-                        playerId:
-                            player.id,
-                        character:
-                            player.character
+                        type: "playerCharacterChanged",
+                        playerId: client.player.id,
+                        character: newCharacter
                     }
                 );
 
@@ -788,28 +796,18 @@ const server = http.createServer(function (req, res) {
                 return;
             }
 
-
             /*
-            ------------------------------------------------
             /char bonzi
-            ------------------------------------------------
             */
-
-            if (
-                text.toLowerCase() ===
-                "/char bonzi"
-            ) {
-                player.character = "bonzi";
+            if (text === "/char bonzi") {
+                client.player.character = "bonzi";
 
                 broadcast(
-                    player.room,
+                    client.player.room,
                     {
-                        type:
-                            "playerCharacterChanged",
-                        playerId:
-                            player.id,
-                        character:
-                            "bonzi"
+                        type: "playerCharacterChanged",
+                        playerId: client.player.id,
+                        character: "bonzi"
                     }
                 );
 
@@ -820,28 +818,18 @@ const server = http.createServer(function (req, res) {
                 return;
             }
 
-
             /*
-            ------------------------------------------------
             /char square
-            ------------------------------------------------
             */
-
-            if (
-                text.toLowerCase() ===
-                "/char square"
-            ) {
-                player.character = "square";
+            if (text === "/char square") {
+                client.player.character = "square";
 
                 broadcast(
-                    player.room,
+                    client.player.room,
                     {
-                        type:
-                            "playerCharacterChanged",
-                        playerId:
-                            player.id,
-                        character:
-                            "square"
+                        type: "playerCharacterChanged",
+                        playerId: client.player.id,
+                        character: "square"
                     }
                 );
 
@@ -852,19 +840,15 @@ const server = http.createServer(function (req, res) {
                 return;
             }
 
-
             /*
-            ------------------------------------------------
-            NORMAL MESSAGE
-            ------------------------------------------------
+            Normal chat message.
             */
-
             broadcast(
-                player.room,
+                client.player.room,
                 {
                     type: "message",
-                    playerId: player.id,
-                    name: player.name,
+                    playerId: client.player.id,
+                    name: client.player.name,
                     text: text
                 }
             );
@@ -872,6 +856,7 @@ const server = http.createServer(function (req, res) {
             sendJSON(res, 200, {
                 ok: true
             });
+
         });
 
         return;
@@ -879,65 +864,74 @@ const server = http.createServer(function (req, res) {
 
 
     /*
-    ========================================================
+    --------------------------------------------------------
     MOVE
-    ========================================================
+    --------------------------------------------------------
     */
 
     if (
-        pathname === "/api/move" &&
-        req.method === "POST"
+        req.method === "POST" &&
+        parsed.pathname === "/api/move"
     ) {
-        parseBody(req, function (body) {
-            const sender = clients[body.senderId];
-
-            if (!sender) {
+        parseBody(req, function(body) {
+            if (!body) {
                 sendJSON(res, 400, {
-                    error: "Invalid sender"
+                    error: "Invalid request"
                 });
-
                 return;
             }
 
-            sender.lastSeen = Date.now();
-
-            const player = players[body.playerId];
-
-            if (!player) {
-                sendJSON(res, 400, {
-                    error: "Player not found"
-                });
-
-                return;
-            }
+            var sender = clients[String(body.senderId)];
 
             if (
-                player.room !==
-                sender.room
+                !sender ||
+                sender.removed ||
+                !sender.player
             ) {
-                sendJSON(res, 403, {
-                    error: "Different room"
+                sendJSON(res, 404, {
+                    error: "Client not found"
                 });
-
                 return;
             }
 
-            player.x = clamp(body.x, 2, 98);
-            player.y = clamp(body.y, 2, 98);
+            sender.lastActivity = Date.now();
+
+            var target = players[String(body.playerId)];
+
+            if (!target) {
+                sendJSON(res, 404, {
+                    error: "Player not found"
+                });
+                return;
+            }
+
+            /*
+            Only allow dragging someone in the same room.
+            */
+            if (target.room !== sender.player.room) {
+                sendJSON(res, 403, {
+                    error: "Wrong room"
+                });
+                return;
+            }
+
+            target.x = clamp(body.x, 2, 98);
+            target.y = clamp(body.y, 2, 98);
 
             broadcast(
-                player.room,
+                target.room,
                 {
                     type: "playerMoved",
-                    playerId: player.id,
-                    x: player.x,
-                    y: player.y
+                    playerId: target.id,
+                    x: target.x,
+                    y: target.y
                 }
             );
 
             sendJSON(res, 200, {
                 ok: true
             });
+
         });
 
         return;
@@ -945,18 +939,27 @@ const server = http.createServer(function (req, res) {
 
 
     /*
-    ========================================================
+    --------------------------------------------------------
     LEAVE
-    ========================================================
+    --------------------------------------------------------
     */
 
     if (
-        pathname === "/api/leave" &&
-        req.method === "POST"
+        req.method === "POST" &&
+        parsed.pathname === "/api/leave"
     ) {
-        parseBody(req, function (body) {
-            if (clients[body.id]) {
-                removeClient(body.id);
+        parseBody(req, function(body) {
+            if (!body) {
+                sendJSON(res, 400, {
+                    error: "Invalid request"
+                });
+                return;
+            }
+
+            var clientId = String(body.id);
+
+            if (clients[clientId]) {
+                removeClient(clientId);
             }
 
             sendJSON(res, 200, {
@@ -969,46 +972,40 @@ const server = http.createServer(function (req, res) {
 
 
     /*
-    ========================================================
-    STATIC FILE
-    ========================================================
+    --------------------------------------------------------
+    STATIC FILES
+    --------------------------------------------------------
     */
 
-    if (req.method === "GET") {
-        serveFile(
-            req,
-            res,
-            pathname
-        );
-
-        return;
-    }
-
-    sendJSON(res, 404, {
-        error: "Not found"
-    });
+    serveStatic(req, res);
 });
 
 
 /*
 ============================================================
-DISCONNECT / TIMEOUT CLEANUP
+BACKUP CLEANUP
 ============================================================
+
+The close event handles normal tab/browser disconnections.
+
+This cleanup is only a backup for cases where a connection
+dies without producing the expected close event.
 */
 
-setInterval(function () {
-    const now = Date.now();
-    let id;
+setInterval(function() {
+    var now = Date.now();
+    var id;
 
     for (id in clients) {
-        if (!Object.prototype.hasOwnProperty.call(clients, id)) {
+        if (!clients.hasOwnProperty(id)) {
             continue;
         }
 
+        var client = clients[id];
+
         if (
-            now -
-            clients[id].lastSeen >
-            120000
+            !client.removed &&
+            now - client.lastActivity > 120000
         ) {
             removeClient(id);
         }
@@ -1022,13 +1019,8 @@ START
 ============================================================
 */
 
-server.listen(
-    PORT,
-    "0.0.0.0",
-    function () {
-        console.log(
-            "Chat server running on port " +
-            PORT
-        );
-    }
-);
+server.listen(PORT, "0.0.0.0", function() {
+    console.log(
+        "Chat server running on port " + PORT
+    );
+});
