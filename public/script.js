@@ -1,47 +1,51 @@
+/* ============================================================
+   CHAT CLIENT
+   IE7+ compatible JavaScript
+   ============================================================ */
+
 var myId = null;
 var myName = "";
-var currentRoom = "";
+var currentRoom = "default";
 
 var players = {};
-
 var draggingPlayer = null;
 var dragging = false;
 
 var pollTimer = null;
 var pollInProgress = false;
 
+var world;
 var loginScreen;
 var desktop;
 var nameInput;
 var roomInput;
 var submitButton;
-var world;
 var messageInput;
 var startButton;
 var settingsButton;
 var settingsPanel;
-var closeSettings;
+var settingsClose;
 
 
-/*
-============================================================
-DOM HELPERS
-============================================================
-*/
+/* ============================================================
+   DOM HELPERS
+   ============================================================ */
 
 function $(id) {
     return document.getElementById(id);
 }
 
-function addEvent(element, name, handler) {
+function addEvent(element, eventName, handler) {
     if (!element) {
         return;
     }
 
-    if (element.attachEvent) {
-        element.attachEvent("on" + name, handler);
-    } else if (element.addEventListener) {
-        element.addEventListener(name, handler, false);
+    if (element.addEventListener) {
+        element.addEventListener(eventName, handler, false);
+    } else if (element.attachEvent) {
+        element.attachEvent("on" + eventName, handler);
+    } else {
+        element["on" + eventName] = handler;
     }
 }
 
@@ -50,9 +54,9 @@ function preventDefault(event) {
 
     if (event.preventDefault) {
         event.preventDefault();
+    } else {
+        event.returnValue = false;
     }
-
-    event.returnValue = false;
 }
 
 function stopEvent(event) {
@@ -60,186 +64,126 @@ function stopEvent(event) {
 
     if (event.stopPropagation) {
         event.stopPropagation();
+    } else {
+        event.cancelBubble = true;
     }
-
-    event.cancelBubble = true;
 }
 
 
-/*
-============================================================
-JSON
-
-IE7 does not have native JSON.parse().
-============================================================
-*/
+/* ============================================================
+   JSON
+   ============================================================ */
 
 function parseJSON(text) {
-    if (window.JSON && typeof JSON.parse === "function") {
+    if (window.JSON && JSON.parse) {
+        return JSON.parse(text);
+    }
+
+    return eval("(" + text + ")");
+}
+
+
+/* ============================================================
+   XHR
+   ============================================================ */
+
+function createXHR() {
+    if (window.XMLHttpRequest) {
+        return new XMLHttpRequest();
+    }
+
+    try {
+        return new ActiveXObject("Microsoft.XMLHTTP");
+    } catch (e1) {
         try {
-            return JSON.parse(text);
-        } catch (e) {
+            return new ActiveXObject("Msxml2.XMLHTTP");
+        } catch (e2) {
             return null;
         }
     }
-
-    try {
-        return eval("(" + text + ")");
-    } catch (e2) {
-        return null;
-    }
 }
 
 
-/*
-============================================================
-AJAX / HTTP POLLING
-============================================================
-*/
+/* ============================================================
+   FORM ENCODING
+   ============================================================ */
 
-function createXHR() {
-    var xhr = null;
+function encodeValue(value) {
+    value = String(value);
 
-    try {
-        xhr = new XMLHttpRequest();
-    } catch (e) {
-        try {
-            xhr = new ActiveXObject("Microsoft.XMLHTTP");
-        } catch (e2) {
-            try {
-                xhr = new ActiveXObject("Msxml2.XMLHTTP");
-            } catch (e3) {
-                xhr = null;
-            }
-        }
-    }
-
-    return xhr;
+    return encodeURIComponent(value);
 }
 
 function encodeForm(data) {
-    var result = "";
+    var parts = [];
     var key;
 
-    if (!data) {
-        return result;
-    }
-
     for (key in data) {
-        if (!data.hasOwnProperty(key)) {
-            continue;
+        if (data.hasOwnProperty) {
+            if (!data.hasOwnProperty(key)) {
+                continue;
+            }
         }
 
-        if (result !== "") {
-            result += "&";
-        }
-
-        result += encodeURIComponent(key);
-        result += "=";
-        result += encodeURIComponent(data[key]);
+        parts.push(
+            encodeURIComponent(key) +
+            "=" +
+            encodeValue(data[key])
+        );
     }
 
-    return result;
+    return parts.join("&");
 }
 
-function ajax(method, url, data, callback) {
-    var xhr;
-    var body;
-    var finished = false;
 
-    xhr = createXHR();
+/* ============================================================
+   AJAX
+   ============================================================ */
+
+function ajax(method, url, data, callback) {
+    var xhr = createXHR();
 
     if (!xhr) {
-        if (callback) {
-            callback(null);
-        }
-
         return;
     }
 
-    body = encodeForm(data);
-
-    try {
-        xhr.open(method, url, true);
-    } catch (e) {
-        if (callback) {
-            callback(null);
-        }
-
-        return;
-    }
+    xhr.open(method, url, true);
 
     if (method === "POST") {
-        try {
-            xhr.setRequestHeader(
-                "Content-Type",
-                "application/x-www-form-urlencoded"
-            );
-        } catch (e2) {}
+        xhr.setRequestHeader(
+            "Content-Type",
+            "application/x-www-form-urlencoded"
+        );
     }
 
     xhr.onreadystatechange = function () {
-        var result;
-
         if (xhr.readyState !== 4) {
             return;
         }
 
-        if (finished) {
-            return;
-        }
-
-        finished = true;
-
-        if (
-            xhr.status >= 200 &&
-            xhr.status < 300
-        ) {
-            result = parseJSON(xhr.responseText);
-
-            if (callback) {
-                callback(result);
-            }
-        } else {
-            if (callback) {
-                callback(null);
-            }
-        }
+        callback(
+            xhr.status,
+            xhr.responseText
+        );
     };
 
-    try {
+    if (method === "POST") {
         xhr.send(
-            method === "POST"
-                ? body
-                : null
+            data ? encodeForm(data) : ""
         );
-    } catch (e3) {
-        if (!finished) {
-            finished = true;
-
-            if (callback) {
-                callback(null);
-            }
-        }
+    } else {
+        xhr.send(null);
     }
 }
 
 
-/*
-============================================================
-LOGIN
-============================================================
-*/
+/* ============================================================
+   JOIN
+   ============================================================ */
 
 function joinRoom() {
-    var name;
-    var room;
-
-    name = nameInput.value;
-    room = roomInput.value;
-
-    name = trim(name);
-    room = trim(room);
+    var name = nameInput.value;
+    var room = roomInput.value;
 
     if (!name) {
         name = "Anonymous";
@@ -261,51 +205,34 @@ function joinRoom() {
             name: name,
             room: room
         },
-        function (result) {
-            var i;
-
+        function (status, response) {
             submitButton.disabled = false;
 
-            if (
-                !result ||
-                !result.id ||
-                !result.player
-            ) {
-                alert(
-                    "Could not connect to the chat server."
-                );
-
+            if (status !== 200) {
+                alert("Could not connect to the server.");
                 return;
             }
 
-            myId = String(result.id);
+            var data;
 
-            currentRoom =
-                result.player.room;
+            try {
+                data = parseJSON(response);
+            } catch (e) {
+                alert("The server returned invalid data.");
+                return;
+            }
 
-            loginScreen.style.display =
-                "none";
+            myId = data.id;
 
-            desktop.style.display =
-                "block";
+            loginScreen.style.display = "none";
+            desktop.style.display = "block";
 
-            createPlayer(
-                result.player
-            );
+            if (data.player) {
+                createPlayer(data.player);
+            }
 
-            if (
-                result.events &&
-                result.events.length
-            ) {
-                for (
-                    i = 0;
-                    i < result.events.length;
-                    i++
-                ) {
-                    handleEvent(
-                        result.events[i]
-                    );
-                }
+            if (data.events) {
+                handleEvents(data.events);
             }
 
             startPolling();
@@ -314,11 +241,9 @@ function joinRoom() {
 }
 
 
-/*
-============================================================
-POLLING
-============================================================
-*/
+/* ============================================================
+   POLLING
+   ============================================================ */
 
 function startPolling() {
     if (pollTimer) {
@@ -330,286 +255,248 @@ function startPolling() {
 }
 
 function poll() {
-    var requestUrl;
+    var xhr;
 
-    if (!myId) {
-        return;
-    }
-
-    if (pollInProgress) {
+    if (!myId || pollInProgress) {
         return;
     }
 
     pollInProgress = true;
 
-    requestUrl =
+    xhr = createXHR();
+
+    if (!xhr) {
+        pollInProgress = false;
+        return;
+    }
+
+    xhr.open(
+        "GET",
         "/api/poll?id=" +
         encodeURIComponent(myId) +
         "&t=" +
-        new Date().getTime();
-
-    ajax(
-        "GET",
-        requestUrl,
-        null,
-        function (result) {
-            var i;
-
-            pollInProgress = false;
-
-            if (
-                result &&
-                result.events
-            ) {
-                for (
-                    i = 0;
-                    i < result.events.length;
-                    i++
-                ) {
-                    handleEvent(
-                        result.events[i]
-                    );
-                }
-            }
-
-            pollTimer =
-                window.setTimeout(
-                    poll,
-                    10
-                );
-        }
+        new Date().getTime(),
+        true
     );
+
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) {
+            return;
+        }
+
+        pollInProgress = false;
+
+        if (xhr.status === 200) {
+            try {
+                var data = parseJSON(xhr.responseText);
+
+                if (data.events) {
+                    handleEvents(data.events);
+                }
+            } catch (e) {
+            }
+        }
+
+        pollTimer = window.setTimeout(
+            poll,
+            10
+        );
+    };
+
+    xhr.send(null);
 }
 
 
-/*
-============================================================
-EVENT HANDLER
-============================================================
-*/
+/* ============================================================
+   EVENTS
+   ============================================================ */
+
+function handleEvents(events) {
+    var i;
+
+    for (i = 0; i < events.length; i++) {
+        handleEvent(events[i]);
+    }
+}
 
 function handleEvent(event) {
-    if (!event) {
+    if (!event || !event.type) {
         return;
     }
 
-    if (
-        event.event ===
-        "playerJoined"
-    ) {
-        createPlayer(event.data);
-        return;
-    }
+    switch (event.type) {
 
-    if (
-        event.event ===
-        "playerMoved"
-    ) {
-        movePlayer(
-            event.data.id,
-            event.data.x,
-            event.data.y
-        );
+        case "playerJoined":
+            createPlayer(event.player);
+            break;
 
-        return;
-    }
+        case "playerMoved":
+            movePlayerFromServer(event);
+            break;
 
-    if (
-        event.event ===
-        "playerColorChanged"
-    ) {
-        changePlayerColor(
-            event.data.id,
-            event.data.color
-        );
+        case "playerColorChanged":
+            if (players[event.playerId]) {
+                players[event.playerId].color =
+                    event.color;
 
-        return;
-    }
+                updatePlayerColor(
+                    players[event.playerId]
+                );
+            }
+            break;
 
-    if (
-        event.event ===
-        "playerCharacterChanged"
-    ) {
-        changePlayerCharacter(
-            event.data.id,
-            event.data.character
-        );
+        case "playerCharacterChanged":
+            if (players[event.playerId]) {
+                changePlayerCharacter(
+                    players[event.playerId],
+                    event.character
+                );
+            }
+            break;
 
-        return;
-    }
+        case "playerLeft":
+            removePlayer(event.playerId);
+            break;
 
-    if (
-        event.event ===
-        "playerLeft"
-    ) {
-        removePlayer(
-            event.data.id
-        );
+        case "message":
+            showMessage(
+                event.playerId,
+                event.name,
+                event.text
+            );
+            break;
 
-        return;
-    }
-
-    if (
-        event.event ===
-        "message"
-    ) {
-        showMessage(
-            event.data.id,
-            event.data.text
-        );
-
-        return;
-    }
-
-    if (
-        event.event ===
-        "systemMessage"
-    ) {
-        showSystemMessage(
-            event.data.text
-        );
+        case "systemMessage":
+            showSystemMessage(event.text);
+            break;
     }
 }
 
 
-/*
-============================================================
-PLAYER CREATION
-============================================================
-*/
+/* ============================================================
+   PLAYER CREATION
+   ============================================================ */
 
 function createPlayer(data) {
-    var id;
+    var existing;
     var player;
-    var element;
-    var nameElement;
-    var characterElement;
+    var name;
 
     if (!data || !data.id) {
         return;
     }
 
-    id = String(data.id);
+    existing = players[data.id];
 
-    if (players[id]) {
-        return;
+    if (existing) {
+        return existing;
     }
 
     player = {
-        id: id,
-
-        name:
-            data.name ||
-            "Anonymous",
-
-        room:
-            data.room ||
-            currentRoom,
-
-        x:
-            parseFloat(data.x),
-
-        y:
-            parseFloat(data.y),
-
-        color:
-            data.color ||
-            "#8800ff",
-
-        character:
-            data.character ||
-            "bonzi",
-
+        id: data.id,
+        name: data.name || "Anonymous",
+        room: data.room || currentRoom,
+        x: data.x || 50,
+        y: data.y || 50,
+        color: data.color || "#800080",
+        character: data.character || "bonzi",
         element: null,
-
-        bubble: null,
-
-        bubbleTimer: null
+        nameElement: null,
+        imageElement: null,
+        bubbleElement: null
     };
 
-    if (isNaN(player.x)) {
-        player.x = 50;
-    }
+    players[player.id] = player;
 
-    if (isNaN(player.y)) {
-        player.y = 50;
-    }
-
-    element =
+    player.element =
         document.createElement("div");
 
-    if (
-        player.character ===
-        "bonzi"
-    ) {
-        element.className =
-            "player bonziPlayer";
+    player.element.className =
+        "player";
+
+    if (player.character === "bonzi") {
+        player.element.className +=
+            " bonziPlayer";
     } else {
-        element.className =
-            "player squareCharacter";
+        player.element.className +=
+            " squareCharacter";
     }
 
-    nameElement =
+    name =
         document.createElement("div");
 
-    nameElement.className =
+    name.className =
         "playerName";
 
-    nameElement.appendChild(
-        document.createTextNode(
-            player.name
-        )
-    );
+    name.innerHTML =
+        escapeHTML(player.name);
 
-    element.appendChild(
-        nameElement
-    );
+    player.nameElement = name;
 
-    if (
-        player.character ===
-        "bonzi"
-    ) {
-        characterElement =
+    player.element.appendChild(name);
+
+    if (player.character === "bonzi") {
+        player.imageElement =
             document.createElement("img");
 
-        characterElement.className =
+        player.imageElement.className =
             "bonziCharacter";
 
-        characterElement.src =
+        player.imageElement.src =
             "/bonzi.png";
 
-        characterElement.alt = "";
+        player.imageElement.alt =
+            "";
 
-        element.appendChild(
-            characterElement
+        player.element.appendChild(
+            player.imageElement
         );
     }
 
-    player.element = element;
-
-    players[id] = player;
-
-    world.appendChild(element);
+    world.appendChild(
+        player.element
+    );
 
     updatePlayerPosition(player);
-
     updatePlayerColor(player);
-
     setupDragging(player);
+
+    return player;
 }
 
 
-/*
-============================================================
-PLAYER POSITION
-============================================================
-*/
+/* ============================================================
+   HTML ESCAPING
+   ============================================================ */
+
+function escapeHTML(text) {
+    var div;
+
+    text = String(text);
+
+    if (document.createElement) {
+        div = document.createElement("div");
+        div.appendChild(
+            document.createTextNode(text)
+        );
+
+        return div.innerHTML;
+    }
+
+    return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
+
+/* ============================================================
+   PLAYER POSITION
+   ============================================================ */
 
 function updatePlayerPosition(player) {
-    if (
-        !player ||
-        !player.element
-    ) {
+    if (!player || !player.element) {
         return;
     }
 
@@ -620,52 +507,37 @@ function updatePlayerPosition(player) {
         player.y + "%";
 }
 
-function movePlayer(id, x, y) {
+function movePlayerFromServer(event) {
     var player;
 
-    player =
-        players[String(id)];
+    if (!event) {
+        return;
+    }
+
+    player = players[event.playerId];
 
     if (!player) {
         return;
     }
 
-    player.x = parseFloat(x);
-    player.y = parseFloat(y);
-
-    if (isNaN(player.x)) {
-        player.x = 50;
-    }
-
-    if (isNaN(player.y)) {
-        player.y = 50;
-    }
+    player.x = event.x;
+    player.y = event.y;
 
     updatePlayerPosition(player);
 }
 
 
-/*
-============================================================
-DRAGGING
-
-Everyone can drag everyone.
-
-The server receives both:
-
-senderId = the person doing the dragging
-
-playerId = the character being dragged
-============================================================
-*/
+/* ============================================================
+   DRAGGING
+   ============================================================ */
 
 function setupDragging(player) {
-    var element;
-
-    element = player.element;
+    if (!player || !player.element) {
+        return;
+    }
 
     addEvent(
-        element,
+        player.element,
         "mousedown",
         function (event) {
             beginDrag(
@@ -676,19 +548,8 @@ function setupDragging(player) {
     );
 
     addEvent(
-        element,
+        player.element,
         "touchstart",
-        function (event) {
-            beginDrag(
-                player,
-                event
-            );
-        }
-    );
-
-    addEvent(
-        element,
-        "pointerdown",
         function (event) {
             beginDrag(
                 player,
@@ -701,16 +562,13 @@ function setupDragging(player) {
 function getPointerPosition(event) {
     var touch;
 
-    event =
-        event ||
-        window.event;
+    event = event || window.event;
 
     if (
         event.touches &&
         event.touches.length
     ) {
-        touch =
-            event.touches[0];
+        touch = event.touches[0];
 
         return {
             x: touch.clientX,
@@ -722,8 +580,7 @@ function getPointerPosition(event) {
         event.changedTouches &&
         event.changedTouches.length
     ) {
-        touch =
-            event.changedTouches[0];
+        touch = event.changedTouches[0];
 
         return {
             x: touch.clientX,
@@ -738,29 +595,50 @@ function getPointerPosition(event) {
 }
 
 function beginDrag(player, event) {
+    var pointer;
+
     if (!player) {
         return;
     }
 
+    event = event || window.event;
+
+    pointer =
+        getPointerPosition(event);
+
     draggingPlayer = player;
     dragging = true;
+
+    draggingPlayer.dragOffsetX =
+        pointer.x;
+
+    draggingPlayer.dragOffsetY =
+        pointer.y;
+
+    if (
+        player.element.setCapture
+    ) {
+        try {
+            player.element.setCapture();
+        } catch (e) {
+        }
+    }
 
     preventDefault(event);
     stopEvent(event);
 }
 
 function dragMove(event) {
-    var pointer;
     var rect;
+    var pointer;
     var x;
     var y;
 
-    if (
-        !dragging ||
-        !draggingPlayer
-    ) {
+    if (!dragging || !draggingPlayer) {
         return;
     }
+
+    event = event || window.event;
 
     pointer =
         getPointerPosition(event);
@@ -768,45 +646,33 @@ function dragMove(event) {
     rect =
         world.getBoundingClientRect();
 
-    if (
-        !rect ||
-        !rect.width ||
-        !rect.height
-    ) {
+    if (!rect.width) {
         return;
     }
 
     x =
-        (
-            pointer.x -
-            rect.left
-        ) /
-        rect.width *
-        100;
+        ((pointer.x - rect.left) /
+        rect.width) * 100;
 
     y =
-        (
-            pointer.y -
-            rect.top
-        ) /
-        rect.height *
-        100;
+        ((pointer.y - rect.top) /
+        rect.height) * 100;
 
-    x = Math.max(
-        2,
-        Math.min(
-            98,
-            x
-        )
-    );
+    if (x < 2) {
+        x = 2;
+    }
 
-    y = Math.max(
-        2,
-        Math.min(
-            98,
-            y
-        )
-    );
+    if (x > 98) {
+        x = 98;
+    }
+
+    if (y < 2) {
+        y = 2;
+    }
+
+    if (y > 98) {
+        y = 98;
+    }
 
     draggingPlayer.x = x;
     draggingPlayer.y = y;
@@ -815,33 +681,27 @@ function dragMove(event) {
         draggingPlayer
     );
 
-    if (myId) {
-        ajax(
-            "POST",
-            "/api/move",
-            {
-                senderId:
-                    myId,
-
-                playerId:
-                    draggingPlayer.id,
-
-                x:
-                    x,
-
-                y:
-                    y
-            },
-            null
-        );
-    }
-
     preventDefault(event);
 }
 
 function endDrag(event) {
-    if (!dragging) {
+    if (!dragging || !draggingPlayer) {
         return;
+    }
+
+    event = event || window.event;
+
+    sendPlayerMove(
+        draggingPlayer
+    );
+
+    if (
+        draggingPlayer.element.releaseCapture
+    ) {
+        try {
+            draggingPlayer.element.releaseCapture();
+        } catch (e) {
+        }
     }
 
     dragging = false;
@@ -850,165 +710,118 @@ function endDrag(event) {
     preventDefault(event);
 }
 
-
-/*
-============================================================
-COLOR HANDLING
-============================================================
-*/
-
-function changePlayerColor(
-    id,
-    color
-) {
-    var player;
-
-    player =
-        players[String(id)];
-
-    if (!player) {
+function sendPlayerMove(player) {
+    if (!player || !myId) {
         return;
     }
 
-    player.color = color;
-
-    updatePlayerColor(player);
+    ajax(
+        "POST",
+        "/api/move",
+        {
+            senderId: myId,
+            playerId: player.id,
+            x: player.x,
+            y: player.y
+        },
+        function () {
+        }
+    );
 }
 
-function colorToHue(color) {
+
+/* ============================================================
+   COLOR
+   ============================================================ */
+
+function getHue(color) {
+    var hues = {
+        red: 0,
+        orange: 30,
+        yellow: 60,
+        green: 120,
+        cyan: 180,
+        blue: 240,
+        purple: 270,
+        magenta: 300,
+        pink: 330
+    };
+
     var r;
     var g;
     var b;
     var max;
     var min;
     var h;
+    var delta;
 
-    color =
-        String(color)
-            .toLowerCase();
+    color = String(color).toLowerCase();
 
-    if (color === "red") {
-        return 0;
-    }
-
-    if (color === "orange") {
-        return 30;
-    }
-
-    if (color === "yellow") {
-        return 60;
-    }
-
-    if (color === "green") {
-        return 120;
-    }
-
-    if (color === "cyan") {
-        return 180;
-    }
-
-    if (color === "blue") {
-        return 240;
-    }
-
-    if (color === "purple") {
-        return 270;
-    }
-
-    if (color === "magenta") {
-        return 300;
-    }
-
-    if (color === "pink") {
-        return 330;
+    if (hues[color] !== undefined) {
+        return hues[color];
     }
 
     if (
-        color.charAt(0) !== "#" ||
-        color.length !== 7
+        color.charAt(0) === "#" &&
+        color.length === 7
     ) {
-        return 270;
-    }
-
-    r =
-        parseInt(
-            color.substring(1, 3),
+        r = parseInt(
+            color.substr(1, 2),
             16
-        ) / 255;
-
-    g =
-        parseInt(
-            color.substring(3, 5),
-            16
-        ) / 255;
-
-    b =
-        parseInt(
-            color.substring(5, 7),
-            16
-        ) / 255;
-
-    max =
-        Math.max(
-            r,
-            g,
-            b
         );
 
-    min =
-        Math.min(
-            r,
-            g,
-            b
+        g = parseInt(
+            color.substr(3, 2),
+            16
         );
 
-    if (max === min) {
-        return 0;
+        b = parseInt(
+            color.substr(5, 2),
+            16
+        );
+
+        max = Math.max(r, g, b);
+        min = Math.min(r, g, b);
+        delta = max - min;
+
+        if (delta === 0) {
+            return 0;
+        }
+
+        if (max === r) {
+            h =
+                60 *
+                (((g - b) / delta) % 6);
+        } else if (max === g) {
+            h =
+                60 *
+                (((b - r) / delta) + 2);
+        } else {
+            h =
+                60 *
+                (((r - g) / delta) + 4);
+        }
+
+        if (h < 0) {
+            h += 360;
+        }
+
+        return h;
     }
 
-    if (max === r) {
-        h =
-            (
-                (g - b) /
-                (max - min)
-            ) % 6;
-    } else if (max === g) {
-        h =
-            (
-                (b - r) /
-                (max - min)
-            ) + 2;
-    } else {
-        h =
-            (
-                (r - g) /
-                (max - min)
-            ) + 4;
-    }
-
-    h *= 60;
-
-    if (h < 0) {
-        h += 360;
-    }
-
-    return h;
+    return 270;
 }
 
 function updatePlayerColor(player) {
     var hue;
-    var shift;
+    var filter;
 
-    if (
-        !player ||
-        !player.element
-    ) {
+    if (!player || !player.element) {
         return;
     }
 
     if (
-        player.character ===
-        "square"
+        player.character === "square"
     ) {
         player.element.style.backgroundColor =
             player.color;
@@ -1016,69 +829,61 @@ function updatePlayerColor(player) {
         return;
     }
 
-    hue =
-        colorToHue(
-            player.color
-        );
+    if (
+        player.character !== "bonzi" ||
+        !player.imageElement
+    ) {
+        return;
+    }
 
-    shift =
-        hue - 270;
+    hue = getHue(player.color);
 
     /*
-     * CSS variable is used by the
-     * stylesheet:
-     *
-     * filter:
-     *     hue-rotate(
-     *         var(--bonzi-hue, 0deg)
-     *     );
+     * Original Bonzi image is purple,
+     * approximately 270 degrees.
      */
+    filter =
+        "hue-rotate(" +
+        (hue - 270) +
+        "deg)";
 
+    /*
+     * Modern browsers.
+     */
+    player.imageElement.style.filter =
+        filter;
+
+    /*
+     * Older IE.
+     */
+    player.imageElement.style.msFilter =
+        filter;
+
+    /*
+     * CSS custom property for the
+     * stylesheet.
+     */
     try {
-        player.element.style.setProperty(
+        player.imageElement.style.setProperty(
             "--bonzi-hue",
-            shift + "deg"
+            (hue - 270) + "deg"
         );
     } catch (e) {
-        /*
-         * Older IE does not support
-         * CSS custom properties.
-         *
-         * Fall back to directly
-         * applying the filter.
-         */
-
-        try {
-            player.element.style.filter =
-                "hue-rotate(" +
-                shift +
-                "deg)";
-
-            player.element.style.msFilter =
-                "hue-rotate(" +
-                shift +
-                "deg)";
-        } catch (e2) {}
     }
 }
 
 
-/*
-============================================================
-CHARACTER
-============================================================
-*/
+/* ============================================================
+   CHARACTER
+   ============================================================ */
 
 function changePlayerCharacter(
-    id,
+    player,
     character
 ) {
-    var player;
+    var oldElement;
     var nameElement;
     var image;
-
-    player =
-        players[String(id)];
 
     if (!player) {
         return;
@@ -1092,43 +897,24 @@ function changePlayerCharacter(
     player.character =
         character;
 
-    while (
-        player.element.firstChild
-    ) {
-        player.element.removeChild(
-            player.element.firstChild
-        );
-    }
+    oldElement =
+        player.element;
 
-    if (
-        character ===
-        "bonzi"
-    ) {
-        player.element.className =
-            "player bonziPlayer";
+    nameElement =
+        player.nameElement;
 
-        nameElement =
-            document.createElement(
-                "div"
-            );
+    player.element =
+        document.createElement("div");
 
-        nameElement.className =
-            "playerName";
+    player.element.className =
+        "player";
 
-        nameElement.appendChild(
-            document.createTextNode(
-                player.name
-            )
-        );
-
-        player.element.appendChild(
-            nameElement
-        );
+    if (character === "bonzi") {
+        player.element.className +=
+            " bonziPlayer";
 
         image =
-            document.createElement(
-                "img"
-            );
+            document.createElement("img");
 
         image.className =
             "bonziCharacter";
@@ -1136,100 +922,80 @@ function changePlayerCharacter(
         image.src =
             "/bonzi.png";
 
-        image.alt = "";
+        image.alt =
+            "";
+
+        player.imageElement =
+            image;
+
+        player.element.appendChild(
+            nameElement
+        );
 
         player.element.appendChild(
             image
         );
     } else {
-        player.element.className =
-            "player squareCharacter";
+        player.element.className +=
+            " squareCharacter";
 
-        nameElement =
-            document.createElement(
-                "div"
-            );
-
-        nameElement.className =
-            "playerName";
-
-        nameElement.appendChild(
-            document.createTextNode(
-                player.name
-            )
-        );
+        player.imageElement =
+            null;
 
         player.element.appendChild(
             nameElement
         );
     }
 
+    world.replaceChild(
+        player.element,
+        oldElement
+    );
+
     updatePlayerPosition(player);
     updatePlayerColor(player);
-
     setupDragging(player);
 }
 
 
-/*
-============================================================
-REMOVE PLAYER
-============================================================
-*/
+/* ============================================================
+   REMOVE PLAYER
+   ============================================================ */
 
 function removePlayer(id) {
     var player;
 
-    player =
-        players[String(id)];
+    player = players[id];
 
     if (!player) {
         return;
     }
 
-    if (player.bubbleTimer) {
-        window.clearTimeout(
-            player.bubbleTimer
-        );
-
-        player.bubbleTimer = null;
+    if (player.element) {
+        if (player.element.parentNode) {
+            player.element.parentNode.removeChild(
+                player.element
+            );
+        }
     }
 
-    if (
-        player.bubble &&
-        player.bubble.parentNode
-    ) {
-        player.bubble.parentNode.removeChild(
-            player.bubble
-        );
-    }
-
-    if (
-        player.element &&
-        player.element.parentNode
-    ) {
-        player.element.parentNode.removeChild(
-            player.element
-        );
-    }
-
-    delete players[
-        String(id)
-    ];
+    delete players[id];
 }
 
 
-/*
-============================================================
-MESSAGES
-============================================================
-*/
+/* ============================================================
+   SPEECH BUBBLE
+   ============================================================ */
 
-function showMessage(id, text) {
+function showMessage(
+    playerId,
+    name,
+    text
+) {
     var player;
 
     player =
-        players[String(id)];
+        players[playerId];
 
     if (!player) {
         return;
@@ -1240,26 +1006,8 @@ function showMessage(id, text) {
         text
     );
 
-    /*
-     * Don't speak commands.
-     */
-
-    if (
-        String(text).charAt(0) ===
-        "/"
-    ) {
-        return;
-    }
-
     speakText(text);
 }
-
-
-/*
-============================================================
-SPEECH BUBBLE
-============================================================
-*/
 
 function showSpeechBubble(
     player,
@@ -1267,160 +1015,202 @@ function showSpeechBubble(
 ) {
     var bubble;
 
-    if (
-        !player ||
-        !player.element
-    ) {
+    if (!player || !player.element) {
         return;
     }
 
-    if (player.bubbleTimer) {
-        window.clearTimeout(
-            player.bubbleTimer
-        );
-
-        player.bubbleTimer = null;
-    }
-
-    if (
-        player.bubble &&
-        player.bubble.parentNode
-    ) {
-        player.bubble.parentNode.removeChild(
-            player.bubble
-        );
+    if (player.bubbleElement) {
+        if (
+            player.bubbleElement.parentNode
+        ) {
+            player.bubbleElement.parentNode
+                .removeChild(
+                    player.bubbleElement
+                );
+        }
     }
 
     bubble =
-        document.createElement(
-            "div"
-        );
+        document.createElement("div");
 
     bubble.className =
         "speechBubble";
 
-    bubble.appendChild(
-        document.createTextNode(
-            text
-        )
-    );
+    bubble.innerHTML =
+        escapeHTML(text);
 
     player.element.appendChild(
         bubble
     );
 
-    player.bubble =
+    player.bubbleElement =
         bubble;
 
-    player.bubbleTimer =
-        window.setTimeout(
-            function () {
-                if (
-                    player.bubble ===
-                    bubble
-                ) {
-                    if (
-                        bubble.parentNode
-                    ) {
-                        bubble.parentNode.removeChild(
+    window.setTimeout(
+        function () {
+            if (
+                player.bubbleElement ===
+                bubble
+            ) {
+                if (bubble.parentNode) {
+                    bubble.parentNode
+                        .removeChild(
                             bubble
                         );
-                    }
-
-                    player.bubble =
-                        null;
                 }
 
-                player.bubbleTimer =
+                player.bubbleElement =
                     null;
-            },
-            5000
-        );
+            }
+        },
+        5000
+    );
 }
 
 
+/* ============================================================
+   SPEAK.JS TTS
+   ============================================================ */
+
 /*
-============================================================
-eSPEAK
-
-Uses speakClient.js /
-speakGenerator.js /
-speakWorker.js.
-
-No server-side TTS.
-============================================================
-*/
+ * speakClient.js creates the global speak() function.
+ *
+ * speak.js then:
+ *
+ * speakClient.js
+ *      |
+ *      v
+ * speakWorker.js
+ *      |
+ *      v
+ * speakGenerator.js
+ *      |
+ *      v
+ * WAV
+ *      |
+ *      v
+ * #audio
+ *
+ * We only call speak().
+ */
 
 function speakText(text) {
-    var safeText;
+    var options;
 
-    safeText =
-        String(text);
-
-    if (!safeText) {
+    if (!text) {
         return;
     }
 
     /*
-     * Standard speakClient.js API.
+     * Commands should never be spoken.
+     * The server normally doesn't broadcast
+     * commands as normal messages anyway.
      */
-
     if (
-        typeof window.speak ===
-        "function"
+        text.charAt(0) === "/"
     ) {
-        try {
-            window.speak(
-                safeText
-            );
-        } catch (e) {
-            if (window.console) {
-                try {
-                    window.console.log(
-                        "eSpeak error:",
-                        e
-                    );
-                } catch (e2) {}
-            }
-        }
-
         return;
     }
 
     /*
-     * Alternate generator API.
+     * speakClient.js from the original
+     * speak.js project exposes speak().
      */
-
     if (
-        typeof window.speakGenerator ===
+        typeof window.speak !==
         "function"
     ) {
-        try {
-            window.speakGenerator(
-                safeText
-            );
-        } catch (e3) {}
+        return;
+    }
+
+    options = {
+        amplitude: 100,
+        pitch: 50,
+        speed: 175,
+        wordgap: 0
+    };
+
+    try {
+        window.speak(
+            String(text),
+            options
+        );
+    } catch (e) {
+        /*
+         * If the worker cannot be started,
+         * don't break the chat application.
+         */
     }
 }
 
 
-/*
-============================================================
-SEND MESSAGE
-============================================================
-*/
+/* ============================================================
+   SYSTEM MESSAGE
+   ============================================================ */
+
+function showSystemMessage(text) {
+    var bubble;
+
+    bubble =
+        document.createElement("div");
+
+    bubble.style.position =
+        "fixed";
+
+    bubble.style.left =
+        "50%";
+
+    bubble.style.top =
+        "10px";
+
+    bubble.style.padding =
+        "6px 10px";
+
+    bubble.style.background =
+        "#ffffcc";
+
+    bubble.style.border =
+        "1px solid #000000";
+
+    bubble.style.zIndex =
+        "1000";
+
+    bubble.style.fontFamily =
+        "Tahoma, Arial, sans-serif";
+
+    bubble.style.fontSize =
+        "12px";
+
+    bubble.innerHTML =
+        escapeHTML(text);
+
+    desktop.appendChild(
+        bubble
+    );
+
+    window.setTimeout(
+        function () {
+            if (bubble.parentNode) {
+                bubble.parentNode
+                    .removeChild(
+                        bubble
+                    );
+            }
+        },
+        3000
+    );
+}
+
+
+/* ============================================================
+   SEND MESSAGE
+   ============================================================ */
 
 function sendMessage() {
     var text;
 
-    if (!myId) {
-        return;
-    }
-
     text =
-        trim(
-            messageInput.value
-        );
+        messageInput.value;
 
     if (!text) {
         return;
@@ -1433,200 +1223,43 @@ function sendMessage() {
         "POST",
         "/api/send",
         {
-            id:
-                myId,
-
-            message:
-                text
+            id: myId,
+            text: text
         },
-        null
+        function () {
+        }
     );
 }
 
 
-/*
-============================================================
-SYSTEM MESSAGE
-============================================================
-*/
+/* ============================================================
+   SETTINGS
+   ============================================================ */
 
-function showSystemMessage(text) {
-    if (window.console) {
-        try {
-            window.console.log(
-                text
-            );
-        } catch (e) {}
+function openSettings() {
+    if (!settingsPanel) {
+        return;
     }
+
+    settingsPanel.style.display =
+        "block";
+}
+
+function closeSettings() {
+    if (!settingsPanel) {
+        return;
+    }
+
+    settingsPanel.style.display =
+        "none";
 }
 
 
-/*
-============================================================
-TRIM
-============================================================
-*/
+/* ============================================================
+   GLOBAL DRAG EVENTS
+   ============================================================ */
 
-function trim(text) {
-    return String(text)
-        .replace(
-            /^\s+|\s+$/g,
-            ""
-        );
-}
-
-
-/*
-============================================================
-SETTINGS
-============================================================
-*/
-
-function initialize() {
-    loginScreen =
-        $("loginScreen");
-
-    desktop =
-        $("desktop");
-
-    nameInput =
-        $("nameInput");
-
-    roomInput =
-        $("roomInput");
-
-    submitButton =
-        $("submitButton");
-
-    world =
-        $("world");
-
-    messageInput =
-        $("messageInput");
-
-    startButton =
-        $("startButton");
-
-    settingsButton =
-        $("settingsButton");
-
-    settingsPanel =
-        $("settingsPanel");
-
-    closeSettings =
-        $("closeSettings");
-
-
-    /*
-     * Login
-     */
-
-    addEvent(
-        submitButton,
-        "click",
-        joinRoom
-    );
-
-
-    addEvent(
-        nameInput,
-        "keydown",
-        function (event) {
-            event =
-                event ||
-                window.event;
-
-            if (
-                event.keyCode ===
-                13
-            ) {
-                joinRoom();
-            }
-        }
-    );
-
-
-    addEvent(
-        roomInput,
-        "keydown",
-        function (event) {
-            event =
-                event ||
-                window.event;
-
-            if (
-                event.keyCode ===
-                13
-            ) {
-                joinRoom();
-            }
-        }
-    );
-
-
-    /*
-     * Chat
-     */
-
-    addEvent(
-        startButton,
-        "click",
-        sendMessage
-    );
-
-
-    addEvent(
-        messageInput,
-        "keydown",
-        function (event) {
-            event =
-                event ||
-                window.event;
-
-            if (
-                event.keyCode ===
-                13
-            ) {
-                sendMessage();
-            }
-        }
-    );
-
-
-    /*
-     * Settings
-     */
-
-    addEvent(
-        settingsButton,
-        "click",
-        function (event) {
-            settingsPanel.style.display =
-                "block";
-
-            preventDefault(event);
-            stopEvent(event);
-        }
-    );
-
-
-    addEvent(
-        closeSettings,
-        "click",
-        function (event) {
-            settingsPanel.style.display =
-                "none";
-
-            preventDefault(event);
-            stopEvent(event);
-        }
-    );
-
-
-    /*
-     * Mouse dragging
-     */
-
+function setupGlobalDragging() {
     addEvent(
         document,
         "mousemove",
@@ -1638,11 +1271,6 @@ function initialize() {
         "mouseup",
         endDrag
     );
-
-
-    /*
-     * Touch dragging
-     */
 
     addEvent(
         document,
@@ -1661,74 +1289,162 @@ function initialize() {
         "touchcancel",
         endDrag
     );
-
-
-    /*
-     * Pointer events
-     */
-
-    addEvent(
-        document,
-        "pointermove",
-        dragMove
-    );
-
-    addEvent(
-        document,
-        "pointerup",
-        endDrag
-    );
-
-    addEvent(
-        document,
-        "pointercancel",
-        endDrag
-    );
 }
 
 
-/*
-============================================================
-INITIALIZE
-============================================================
-*/
+/* ============================================================
+   INITIALIZATION
+   ============================================================ */
 
-if (
-    document.readyState ===
-    "complete"
-) {
-    initialize();
-} else {
+function initialize() {
+    world =
+        $("world");
+
+    loginScreen =
+        $("loginScreen");
+
+    desktop =
+        $("desktop");
+
+    nameInput =
+        $("nameInput");
+
+    roomInput =
+        $("roomInput");
+
+    submitButton =
+        $("submitButton");
+
+    messageInput =
+        $("messageInput");
+
+    startButton =
+        $("startButton");
+
+    settingsButton =
+        $("settingsButton");
+
+    settingsPanel =
+        $("settingsPanel");
+
+    settingsClose =
+        $("settingsClose");
+
     addEvent(
-        window,
-        "load",
-        initialize
-    );
-}
-
-
-/*
-============================================================
-LEAVE CHAT
-============================================================
-*/
-
-addEvent(
-    window,
-    "beforeunload",
-    function () {
-        if (!myId) {
-            return;
+        submitButton,
+        "click",
+        function (event) {
+            preventDefault(event);
+            joinRoom();
         }
+    );
 
+    addEvent(
+        nameInput,
+        "keypress",
+        function (event) {
+            event =
+                event || window.event;
+
+            if (event.keyCode === 13) {
+                joinRoom();
+            }
+        }
+    );
+
+    addEvent(
+        roomInput,
+        "keypress",
+        function (event) {
+            event =
+                event || window.event;
+
+            if (event.keyCode === 13) {
+                joinRoom();
+            }
+        }
+    );
+
+    addEvent(
+        startButton,
+        "click",
+        function (event) {
+            preventDefault(event);
+            sendMessage();
+        }
+    );
+
+    addEvent(
+        messageInput,
+        "keypress",
+        function (event) {
+            event =
+                event || window.event;
+
+            if (event.keyCode === 13) {
+                sendMessage();
+            }
+        }
+    );
+
+    addEvent(
+        settingsButton,
+        "click",
+        function (event) {
+            preventDefault(event);
+            openSettings();
+        }
+    );
+
+    addEvent(
+        settingsClose,
+        "click",
+        function (event) {
+            preventDefault(event);
+            closeSettings();
+        }
+    );
+
+    setupGlobalDragging();
+}
+
+
+/* ============================================================
+   LEAVE
+   ============================================================ */
+
+function leaveChat() {
+    if (!myId) {
+        return;
+    }
+
+    try {
         ajax(
             "POST",
             "/api/leave",
             {
-                id:
-                    myId
+                id: myId
             },
-            null
+            function () {
+            }
         );
+    } catch (e) {
     }
+}
+
+
+/* ============================================================
+   START
+   ============================================================ */
+
+addEvent(
+    window,
+    "load",
+    initialize
+);
+
+addEvent(
+    window,
+    "beforeunload",
+    leaveChat
 );
