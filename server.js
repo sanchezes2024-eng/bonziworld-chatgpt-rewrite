@@ -1,17 +1,24 @@
-var http = require("http");
-var fs = require("fs");
-var path = require("path");
-var querystring = require("querystring");
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const querystring = require("querystring");
 
-var PORT = process.env.PORT || 3000;
-var PUBLIC = path.join(__dirname, "public");
+const PORT = process.env.PORT || 3000;
+const PUBLIC_DIR = path.join(__dirname, "public");
 
-var players = {};
-var clients = {};
+const players = {};
+const clients = {};
 
-var nextClientId = 1;
+let nextClientId = 1;
 
-var COLORS = [
+
+/*
+============================================================
+COLORS
+============================================================
+*/
+
+const colorPalette = [
     "#ff0000",
     "#00ff00",
     "#0000ff",
@@ -27,7 +34,7 @@ var COLORS = [
     "#ffffff"
 ];
 
-var COLOR_NAMES = {
+const namedColors = {
     red: "#ff0000",
     green: "#00ff00",
     blue: "#0000ff",
@@ -48,80 +55,26 @@ var COLOR_NAMES = {
     silver: "#c0c0c0"
 };
 
-
-/*
-============================================================
-HELPERS
-============================================================
-*/
-
 function randomColor() {
-    return COLORS[
-        Math.floor(
-            Math.random() *
-            COLORS.length
-        )
+    return colorPalette[
+        Math.floor(Math.random() * colorPalette.length)
     ];
 }
 
-function cleanText(
-    value,
-    max
-) {
-    value =
-        value === undefined ||
-        value === null
-            ? ""
-            : String(value);
-
-    value =
-        value.replace(
-            /[\x00-\x1f\x7f]/g,
-            ""
-        );
-
-    return value.substring(
-        0,
-        max
-    );
-}
-
-function validRoom(room) {
-    return /^[A-Za-z0-9_\- ]{1,40}$/
-        .test(room);
-}
-
-function validName(name) {
-    return /^[^<>]{1,24}$/
-        .test(name);
-}
-
-function validHex(color) {
-    return /^#[0-9a-fA-F]{6}$/
-        .test(color);
-}
-
 function getColor(value) {
-    var lower;
-
-    value =
-        cleanText(
-            value,
-            30
-        );
-
-    lower =
-        value.toLowerCase();
-
-    if (
-        COLOR_NAMES[lower]
-    ) {
-        return COLOR_NAMES[lower];
+    if (!value) {
+        return null;
     }
 
-    if (
-        validHex(value)
-    ) {
+    value = String(value)
+        .toLowerCase()
+        .replace(/^\s+|\s+$/g, "");
+
+    if (namedColors[value]) {
+        return namedColors[value];
+    }
+
+    if (/^#[0-9a-f]{6}$/i.test(value)) {
         return value;
     }
 
@@ -131,318 +84,198 @@ function getColor(value) {
 
 /*
 ============================================================
-JSON
+VALIDATION
 ============================================================
 */
 
-function sendJSON(
-    res,
-    object,
-    status
-) {
-    var body;
-
-    if (
-        res.writableEnded ||
-        res.headersSent
-    ) {
-        return;
+function cleanText(value) {
+    if (value === undefined || value === null) {
+        return "";
     }
 
-    body =
-        JSON.stringify(
-            object
-        );
+    return String(value)
+        .replace(/[\r\n]+/g, " ")
+        .replace(/\s+/g, " ")
+        .replace(/^\s+|\s+$/g, "")
+        .substring(0, 500);
+}
 
-    res.writeHead(
-        status || 200,
-        {
-            "Content-Type":
-                "application/json; charset=utf-8",
+function validName(value) {
+    value = cleanText(value);
 
-            "Content-Length":
-                Buffer.byteLength(
-                    body
-                ),
+    if (!value) {
+        return "Anonymous";
+    }
 
-            "Cache-Control":
-                "no-cache, no-store, must-revalidate",
+    return value.substring(0, 30);
+}
 
-            "Pragma":
-                "no-cache",
+function validRoom(value) {
+    value = cleanText(value);
 
-            "Expires":
-                "0",
+    if (!value) {
+        return "default";
+    }
 
-            "Access-Control-Allow-Origin":
-                "*"
-        }
-    );
+    return value.substring(0, 30);
+}
 
-    res.end(body);
+function clamp(value, min, max) {
+    value = Number(value);
+
+    if (!isFinite(value)) {
+        return min;
+    }
+
+    if (value < min) {
+        return min;
+    }
+
+    if (value > max) {
+        return max;
+    }
+
+    return value;
 }
 
 
 /*
 ============================================================
-BODY PARSER
+JSON RESPONSE
 ============================================================
 */
 
-function parseBody(
-    req,
-    callback
-) {
-    var data = "";
-    var finished = false;
+function sendJSON(res, status, data) {
+    if (res.writableEnded || res.headersSent) {
+        return;
+    }
 
-    function finish(result) {
+    const output = JSON.stringify(data);
+
+    res.writeHead(status, {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Access-Control-Allow-Origin": "*"
+    });
+
+    res.end(output);
+}
+
+
+/*
+============================================================
+POST BODY
+============================================================
+*/
+
+function parseBody(req, callback) {
+    let body = "";
+    let finished = false;
+
+    function finish() {
         if (finished) {
             return;
         }
 
         finished = true;
 
-        callback(result);
+        try {
+            callback(querystring.parse(body));
+        } catch (e) {
+            callback({});
+        }
     }
 
-    req.on(
-        "data",
-        function (chunk) {
-            data += chunk;
-
-            if (
-                data.length >
-                100000
-            ) {
-                try {
-                    req.destroy();
-                } catch (e) {}
-
-                finish({});
-
-                return;
-            }
+    req.on("data", function (chunk) {
+        if (finished) {
+            return;
         }
-    );
 
-    req.on(
-        "end",
-        function () {
-            finish(
-                querystring.parse(
-                    data
-                )
-            );
-        }
-    );
+        body += chunk.toString();
 
-    req.on(
-        "error",
-        function () {
-            finish({});
+        if (body.length > 100000) {
+            finished = true;
+            req.destroy();
         }
-    );
+    });
+
+    req.on("end", finish);
+
+    req.on("error", function () {
+        finish();
+    });
 }
 
 
 /*
 ============================================================
-POLL EVENTS
+EVENT QUEUES
 ============================================================
 */
 
-function addEvent(
-    client,
-    event,
-    data
-) {
+function addEvent(clientId, event) {
+    const client = clients[clientId];
+
     if (!client) {
         return;
     }
 
-    client.events.push({
-        event: event,
-        data: data
-    });
+    client.events.push(event);
 
-    if (client.res) {
-        finishPoll(
-            client
-        );
+    if (client.pendingResponse) {
+        finishPoll(client);
     }
 }
 
-function broadcast(
-    room,
-    event,
-    data
-) {
-    var id;
-    var client;
+function broadcast(room, event, exceptClientId) {
+    let id;
 
     for (id in clients) {
-        if (
-            !clients.hasOwnProperty(id)
-        ) {
+        if (!Object.prototype.hasOwnProperty.call(clients, id)) {
             continue;
         }
 
-        client =
-            clients[id];
+        const client = clients[id];
 
         if (
-            client.room ===
-            room
+            client.room === room &&
+            id !== exceptClientId
         ) {
-            addEvent(
-                client,
-                event,
-                data
-            );
+            addEvent(id, event);
         }
     }
 }
 
-function finishPoll(
-    client
-) {
-    var res;
-    var events;
+function finishPoll(client) {
+    if (!client.pendingResponse) {
+        return;
+    }
+
+    const response = client.pendingResponse;
+
+    client.pendingResponse = null;
+
+    if (client.pollTimer) {
+        clearTimeout(client.pollTimer);
+        client.pollTimer = null;
+    }
 
     if (
-        !client ||
-        !client.res
+        response.writableEnded ||
+        response.headersSent
     ) {
         return;
     }
 
-    res =
-        client.res;
-
-    client.res =
-        null;
-
-    if (
-        client.pollTimer
-    ) {
-        clearTimeout(
-            client.pollTimer
-        );
-
-        client.pollTimer =
-            null;
-    }
-
-    events =
-        client.events;
-
-    client.events =
-        [];
-
-    if (
-        res.writableEnded ||
-        res.headersSent
-    ) {
-        return;
-    }
-
-    sendJSON(
-        res,
-        {
-            events: events
-        }
+    const events = client.events.splice(
+        0,
+        client.events.length
     );
-}
 
-function pollClient(
-    client,
-    res
-) {
-    var events;
-
-    if (!client) {
-        sendJSON(
-            res,
-            {
-                error:
-                    "invalid client"
-            },
-            400
-        );
-
-        return;
-    }
-
-    client.lastSeen =
-        Date.now();
-
-    if (client.res) {
-        try {
-            if (
-                !client.res.writableEnded
-            ) {
-                client.res.end();
-            }
-        } catch (e) {}
-
-        client.res =
-            null;
-    }
-
-    if (
-        client.events.length >
-        0
-    ) {
-        events =
-            client.events;
-
-        client.events =
-            [];
-
-        sendJSON(
-            res,
-            {
-                events: events
-            }
-        );
-
-        return;
-    }
-
-    client.res =
-        res;
-
-    client.pollTimer =
-        setTimeout(
-            function () {
-                if (
-                    client.res !==
-                    res
-                ) {
-                    return;
-                }
-
-                client.res =
-                    null;
-
-                client.pollTimer =
-                    null;
-
-                if (
-                    !res.writableEnded &&
-                    !res.headersSent
-                ) {
-                    sendJSON(
-                        res,
-                        {
-                            events: []
-                        }
-                    );
-                }
-            },
-            25000
-        );
+    sendJSON(response, 200, {
+        events: events
+    });
 }
 
 
@@ -452,60 +285,48 @@ REMOVE CLIENT
 ============================================================
 */
 
-function removeClient(
-    client
-) {
-    var player;
+function removeClient(clientId) {
+    const client = clients[clientId];
 
     if (!client) {
         return;
     }
 
-    player =
-        players[client.id];
+    if (client.pollTimer) {
+        clearTimeout(client.pollTimer);
+        client.pollTimer = null;
+    }
+
+    if (client.pendingResponse) {
+        const response = client.pendingResponse;
+
+        client.pendingResponse = null;
+
+        if (!response.writableEnded) {
+            response.end(
+                JSON.stringify({
+                    events: []
+                })
+            );
+        }
+    }
+
+    const player = players[client.playerId];
 
     if (player) {
         broadcast(
             player.room,
-            "playerLeft",
             {
-                id:
-                    player.id
-            }
+                type: "playerLeft",
+                playerId: player.id
+            },
+            clientId
         );
 
-        delete players[
-            client.id
-        ];
+        delete players[player.id];
     }
 
-    if (
-        client.pollTimer
-    ) {
-        clearTimeout(
-            client.pollTimer
-        );
-
-        client.pollTimer =
-            null;
-    }
-
-    if (client.res) {
-        try {
-            if (
-                !client.res.writableEnded
-            ) {
-                client.res.end();
-            }
-        } catch (e) {}
-
-        client.res =
-            null;
-    }
-
-    delete clients[
-        client.id
-    ];
+    delete clients[clientId];
 }
 
 
@@ -515,80 +336,36 @@ JOIN
 ============================================================
 */
 
-function joinClient(
-    name,
-    room
-) {
-    var id;
+function joinClient(name, room) {
+    const id = String(nextClientId++);
 
-    id =
-        String(
-            nextClientId++
-        );
-
-    name =
-        cleanText(
-            name,
-            24
-        );
-
-    room =
-        cleanText(
-            room,
-            40
-        );
-
-    if (
-        !name ||
-        !validName(name)
-    ) {
-        name =
-            "Anonymous";
-    }
-
-    if (
-        !room ||
-        !validRoom(room)
-    ) {
-        room =
-            "default";
-    }
-
-    clients[id] = {
+    const player = {
         id: id,
-        room: room,
+        name: validName(name),
+        room: validRoom(room),
+        x: Math.random() * 90 + 5,
+        y: Math.random() * 80 + 10,
+        color: randomColor(),
+        character: "bonzi"
+    };
+
+    const client = {
+        id: id,
+        playerId: id,
+        room: player.room,
         events: [],
-        res: null,
+        pendingResponse: null,
         pollTimer: null,
-        lastSeen:
-            Date.now()
+        lastSeen: Date.now()
     };
 
-    players[id] = {
-        id: id,
+    players[id] = player;
+    clients[id] = client;
 
-        name: name,
-
-        room: room,
-
-        x:
-            Math.random() *
-            90 +
-            5,
-
-        y:
-            Math.random() *
-            80 +
-            10,
-
-        color:
-            randomColor(),
-
-        character:
-            "bonzi"
+    return {
+        client: client,
+        player: player
     };
-
-    return players[id];
 }
 
 
@@ -598,111 +375,57 @@ STATIC FILES
 ============================================================
 */
 
-function serveStatic(
-    req,
-    res,
-    pathname
-) {
-    var file;
-    var ext;
-    var types;
+const mimeTypes = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".wav": "audio/wav",
+    ".mp3": "audio/mpeg",
+    ".ico": "image/x-icon"
+};
 
-    if (
-        pathname === "/"
-    ) {
-        pathname =
-            "/index.html";
+function serveFile(req, res, pathname) {
+    if (pathname === "/") {
+        pathname = "/index.html";
     }
 
-    try {
-        pathname =
-            decodeURIComponent(
-                pathname
-            );
-    } catch (e) {
-        res.writeHead(400);
-        res.end(
-            "Bad Request"
-        );
+    if (
+        pathname.indexOf("..") !== -1 ||
+        pathname.indexOf("\\") !== -1
+    ) {
+        sendJSON(res, 403, {
+            error: "Forbidden"
+        });
 
         return;
     }
 
+    const filePath = path.join(
+        PUBLIC_DIR,
+        pathname.substring(1)
+    );
+
     if (
-        pathname.indexOf(
-            ".."
-        ) !== -1
+        filePath.indexOf(PUBLIC_DIR) !== 0
     ) {
-        res.writeHead(403);
-        res.end(
-            "Forbidden"
-        );
+        sendJSON(res, 403, {
+            error: "Forbidden"
+        });
 
         return;
     }
-
-    file =
-        path.join(
-            PUBLIC,
-            pathname
-        );
-
-    ext =
-        path.extname(
-            file
-        ).toLowerCase();
-
-    types = {
-        ".html":
-            "text/html; charset=utf-8",
-
-        ".css":
-            "text/css; charset=utf-8",
-
-        ".js":
-            "application/javascript; charset=utf-8",
-
-        ".png":
-            "image/png",
-
-        ".jpg":
-            "image/jpeg",
-
-        ".jpeg":
-            "image/jpeg",
-
-        ".gif":
-            "image/gif",
-
-        ".wav":
-            "audio/wav",
-
-        ".mp3":
-            "audio/mpeg",
-
-        ".ico":
-            "image/x-icon"
-    };
 
     fs.readFile(
-        file,
-        function (
-            err,
-            data
-        ) {
-            if (err) {
-                if (
-                    !res.writableEnded &&
-                    !res.headersSent
-                ) {
-                    res.writeHead(
-                        404
-                    );
-
-                    res.end(
-                        "Not Found"
-                    );
-                }
+        filePath,
+        function (error, data) {
+            if (error) {
+                sendJSON(res, 404, {
+                    error: "Not found"
+                });
 
                 return;
             }
@@ -714,20 +437,15 @@ function serveStatic(
                 return;
             }
 
-            res.writeHead(
-                200,
-                {
-                    "Content-Type":
-                        types[ext] ||
-                        "application/octet-stream",
+            const ext = path.extname(filePath).toLowerCase();
 
-                    "Content-Length":
-                        data.length,
+            res.writeHead(200, {
+                "Content-Type":
+                    mimeTypes[ext] ||
+                    "application/octet-stream",
 
-                    "Cache-Control":
-                        "no-cache"
-                }
-            );
+                "Cache-Control": "no-cache"
+            });
 
             res.end(data);
         }
@@ -737,684 +455,565 @@ function serveStatic(
 
 /*
 ============================================================
-SERVER
+HTTP SERVER
 ============================================================
 */
 
-var server =
-    http.createServer(
-        function (
-            req,
-            res
-        ) {
-            var requestUrl;
-            var pathname;
-            var id;
-            var client;
-
-            try {
-                requestUrl =
-                    new URL(
-                        req.url,
-                        "http://" +
-                        (
-                            req.headers.host ||
-                            "localhost"
-                        )
-                    );
-            } catch (e) {
-                res.writeHead(
-                    400
-                );
-
-                res.end(
-                    "Bad Request"
-                );
-
-                return;
-            }
-
-            pathname =
-                requestUrl.pathname;
-
-
-            /*
-             * JOIN
-             */
-
-            if (
-                pathname ===
-                "/api/join" &&
-                req.method ===
-                "POST"
-            ) {
-                parseBody(
-                    req,
-                    function (
-                        body
-                    ) {
-                        var player;
-                        var otherId;
-                        var existing;
-
-                        player =
-                            joinClient(
-                                body.name,
-                                body.room
-                            );
-
-                        for (
-                            otherId in
-                            players
-                        ) {
-                            if (
-                                !players
-                                    .hasOwnProperty(
-                                        otherId
-                                    )
-                            ) {
-                                continue;
-                            }
-
-                            existing =
-                                players[
-                                    otherId
-                                ];
-
-                            if (
-                                otherId !==
-                                player.id &&
-                                existing.room ===
-                                player.room
-                            ) {
-                                clients[
-                                    player.id
-                                ].events.push({
-                                    event:
-                                        "playerJoined",
-
-                                    data:
-                                        existing
-                                });
-                            }
-                        }
-
-                        sendJSON(
-                            res,
-                            {
-                                id:
-                                    player.id,
-
-                                player:
-                                    player,
-
-                                events:
-                                    clients[
-                                        player.id
-                                    ].events
-                            }
-                        );
-
-                        clients[
-                            player.id
-                        ].events =
-                            [];
-
-                        broadcast(
-                            player.room,
-                            "playerJoined",
-                            player
-                        );
-                    }
-                );
-
-                return;
-            }
-
-
-            /*
-             * POLL
-             */
-
-            if (
-                pathname ===
-                "/api/poll" &&
-                req.method ===
-                "GET"
-            ) {
-                id =
-                    requestUrl
-                        .searchParams
-                        .get("id");
-
-                client =
-                    clients[id];
-
-                pollClient(
-                    client,
-                    res
-                );
-
-                return;
-            }
-
-
-            /*
-             * SEND
-             */
-
-            if (
-                pathname ===
-                "/api/send" &&
-                req.method ===
-                "POST"
-            ) {
-                parseBody(
-                    req,
-                    function (
-                        body
-                    ) {
-                        var message;
-                        var color;
-
-                        client =
-                            clients[
-                                String(
-                                    body.id
-                                )
-                            ];
-
-                        if (
-                            !client ||
-                            !players[
-                                client.id
-                            ]
-                        ) {
-                            sendJSON(
-                                res,
-                                {
-                                    error:
-                                        "invalid client"
-                                },
-                                400
-                            );
-
-                            return;
-                        }
-
-                        client.lastSeen =
-                            Date.now();
-
-                        message =
-                            cleanText(
-                                body.message,
-                                500
-                            );
-
-                        if (!message) {
-                            sendJSON(
-                                res,
-                                {
-                                    ok: true
-                                }
-                            );
-
-                            return;
-                        }
-
-
-                        /*
-                         * /color
-                         */
-
-                        if (
-                            message.indexOf(
-                                "/color "
-                            ) === 0
-                        ) {
-                            color =
-                                getColor(
-                                    message.substring(
-                                        7
-                                    )
-                                );
-
-                            if (!color) {
-                                broadcast(
-                                    client.room,
-                                    "systemMessage",
-                                    {
-                                        text:
-                                            "Invalid color."
-                                    }
-                                );
-                            } else {
-                                players[
-                                    client.id
-                                ].color =
-                                    color;
-
-                                broadcast(
-                                    client.room,
-                                    "playerColorChanged",
-                                    {
-                                        id:
-                                            client.id,
-
-                                        color:
-                                            color
-                                    }
-                                );
-                            }
-
-                            sendJSON(
-                                res,
-                                {
-                                    ok: true
-                                }
-                            );
-
-                            return;
-                        }
-
-
-                        /*
-                         * Random color
-                         */
-
-                        if (
-                            message ===
-                            "/color"
-                        ) {
-                            players[
-                                client.id
-                            ].color =
-                                randomColor();
-
-                            broadcast(
-                                client.room,
-                                "playerColorChanged",
-                                {
-                                    id:
-                                        client.id,
-
-                                    color:
-                                        players[
-                                            client.id
-                                        ].color
-                                }
-                            );
-
-                            sendJSON(
-                                res,
-                                {
-                                    ok: true
-                                }
-                            );
-
-                            return;
-                        }
-
-
-                        /*
-                         * Character
-                         */
-
-                        if (
-                            message ===
-                            "/char bonzi" ||
-                            message ===
-                            "/char square"
-                        ) {
-                            players[
-                                client.id
-                            ].character =
-                                message.substring(
-                                    6
-                                ) ===
-                                "square"
-                                    ? "square"
-                                    : "bonzi";
-
-                            broadcast(
-                                client.room,
-                                "playerCharacterChanged",
-                                {
-                                    id:
-                                        client.id,
-
-                                    character:
-                                        players[
-                                            client.id
-                                        ].character
-                                }
-                            );
-
-                            sendJSON(
-                                res,
-                                {
-                                    ok: true
-                                }
-                            );
-
-                            return;
-                        }
-
-
-                        /*
-                         * Toggle
-                         */
-
-                        if (
-                            message ===
-                            "/char"
-                        ) {
-                            players[
-                                client.id
-                            ].character =
-                                players[
-                                    client.id
-                                ].character ===
-                                "bonzi"
-                                    ? "square"
-                                    : "bonzi";
-
-                            broadcast(
-                                client.room,
-                                "playerCharacterChanged",
-                                {
-                                    id:
-                                        client.id,
-
-                                    character:
-                                        players[
-                                            client.id
-                                        ].character
-                                }
-                            );
-
-                            sendJSON(
-                                res,
-                                {
-                                    ok: true
-                                }
-                            );
-
-                            return;
-                        }
-
-
-                        /*
-                         * Normal message
-                         */
-
-                        broadcast(
-                            client.room,
-                            "message",
-                            {
-                                id:
-                                    client.id,
-
-                                text:
-                                    message
-                            }
-                        );
-
-                        sendJSON(
-                            res,
-                            {
-                                ok: true
-                            }
-                        );
-                    }
-                );
-
-                return;
-            }
-
-
-            /*
-             * MOVE
-             */
-
-            if (
-                pathname ===
-                "/api/move" &&
-                req.method ===
-                "POST"
-            ) {
-                parseBody(
-                    req,
-                    function (
-                        body
-                    ) {
-                        var sender;
-                        var target;
-                        var x;
-                        var y;
-
-                        sender =
-                            clients[
-                                String(
-                                    body.senderId
-                                )
-                            ];
-
-                        if (!sender) {
-                            sendJSON(
-                                res,
-                                {
-                                    error:
-                                        "invalid sender"
-                                },
-                                400
-                            );
-
-                            return;
-                        }
-
-                        sender.lastSeen =
-                            Date.now();
-
-                        target =
-                            players[
-                                String(
-                                    body.playerId
-                                )
-                            ];
-
-                        if (
-                            !target ||
-                            target.room !==
-                            sender.room
-                        ) {
-                            sendJSON(
-                                res,
-                                {
-                                    error:
-                                        "invalid target"
-                                },
-                                400
-                            );
-
-                            return;
-                        }
-
-                        x =
-                            parseFloat(
-                                body.x
-                            );
-
-                        y =
-                            parseFloat(
-                                body.y
-                            );
-
-                        if (
-                            isNaN(x) ||
-                            isNaN(y)
-                        ) {
-                            sendJSON(
-                                res,
-                                {
-                                    error:
-                                        "invalid position"
-                                },
-                                400
-                            );
-
-                            return;
-                        }
-
-                        x =
-                            Math.max(
-                                2,
-                                Math.min(
-                                    98,
-                                    x
-                                )
-                            );
-
-                        y =
-                            Math.max(
-                                2,
-                                Math.min(
-                                    98,
-                                    y
-                                )
-                            );
-
-                        target.x =
-                            x;
-
-                        target.y =
-                            y;
-
-                        broadcast(
-                            target.room,
-                            "playerMoved",
-                            {
-                                id:
-                                    target.id,
-
-                                x:
-                                    x,
-
-                                y:
-                                    y
-                            }
-                        );
-
-                        sendJSON(
-                            res,
-                            {
-                                ok: true
-                            }
-                        );
-                    }
-                );
-
-                return;
-            }
-
-
-            /*
-             * LEAVE
-             */
-
-            if (
-                pathname ===
-                "/api/leave" &&
-                req.method ===
-                "POST"
-            ) {
-                parseBody(
-                    req,
-                    function (
-                        body
-                    ) {
-                        client =
-                            clients[
-                                String(
-                                    body.id
-                                )
-                            ];
-
-                        if (client) {
-                            removeClient(
-                                client
-                            );
-                        }
-
-                        sendJSON(
-                            res,
-                            {
-                                ok: true
-                            }
-                        );
-                    }
-                );
-
-                return;
-            }
-
-
-            /*
-             * STATIC
-             */
-
-            serveStatic(
-                req,
-                res,
-                pathname
+const server = http.createServer(function (req, res) {
+    let parsed;
+
+    try {
+        parsed = new URL(
+            req.url,
+            "http://" +
+            (req.headers.host || "localhost")
+        );
+    } catch (e) {
+        sendJSON(res, 400, {
+            error: "Bad request"
+        });
+
+        return;
+    }
+
+    const pathname = parsed.pathname;
+
+
+    /*
+    ========================================================
+    JOIN
+    ========================================================
+    */
+
+    if (
+        pathname === "/api/join" &&
+        req.method === "POST"
+    ) {
+        parseBody(req, function (body) {
+            const result = joinClient(
+                body.name,
+                body.room
             );
+
+            const client = result.client;
+            const player = result.player;
+
+            let id;
+
+            for (id in players) {
+                if (!Object.prototype.hasOwnProperty.call(players, id)) {
+                    continue;
+                }
+
+                if (id === player.id) {
+                    continue;
+                }
+
+                if (
+                    players[id].room ===
+                    player.room
+                ) {
+                    client.events.push({
+                        type: "playerJoined",
+                        player: players[id]
+                    });
+                }
+            }
+
+            broadcast(
+                player.room,
+                {
+                    type: "playerJoined",
+                    player: player
+                },
+                client.id
+            );
+
+            sendJSON(res, 200, {
+                id: client.id,
+                player: player,
+                events: client.events.splice(
+                    0,
+                    client.events.length
+                )
+            });
+        });
+
+        return;
+    }
+
+
+    /*
+    ========================================================
+    POLL
+    ========================================================
+    */
+
+    if (
+        pathname === "/api/poll" &&
+        req.method === "GET"
+    ) {
+        const id = parsed.searchParams.get("id");
+        const client = clients[id];
+
+        if (!client) {
+            sendJSON(res, 400, {
+                error: "Invalid client"
+            });
+
+            return;
         }
-    );
+
+        client.lastSeen = Date.now();
+
+        if (client.pendingResponse) {
+            const oldResponse = client.pendingResponse;
+
+            client.pendingResponse = null;
+
+            if (client.pollTimer) {
+                clearTimeout(client.pollTimer);
+                client.pollTimer = null;
+            }
+
+            if (!oldResponse.writableEnded) {
+                oldResponse.end(
+                    JSON.stringify({
+                        events: []
+                    })
+                );
+            }
+        }
+
+        if (client.events.length > 0) {
+            sendJSON(res, 200, {
+                events: client.events.splice(
+                    0,
+                    client.events.length
+                )
+            });
+
+            return;
+        }
+
+        client.pendingResponse = res;
+
+        client.pollTimer = setTimeout(
+            function () {
+                if (
+                    client.pendingResponse ===
+                    res
+                ) {
+                    client.pendingResponse = null;
+                    client.pollTimer = null;
+
+                    if (
+                        !res.writableEnded &&
+                        !res.headersSent
+                    ) {
+                        sendJSON(res, 200, {
+                            events: []
+                        });
+                    }
+                }
+            },
+            25000
+        );
+
+        return;
+    }
+
+
+    /*
+    ========================================================
+    SEND MESSAGE
+    ========================================================
+    */
+
+    if (
+        pathname === "/api/send" &&
+        req.method === "POST"
+    ) {
+        parseBody(req, function (body) {
+            const client = clients[body.id];
+
+            if (!client) {
+                sendJSON(res, 400, {
+                    error: "Invalid client"
+                });
+
+                return;
+            }
+
+            client.lastSeen = Date.now();
+
+            const player = players[client.playerId];
+
+            if (!player) {
+                sendJSON(res, 400, {
+                    error: "Player not found"
+                });
+
+                return;
+            }
+
+            const text = cleanText(body.text);
+
+            if (!text) {
+                sendJSON(res, 400, {
+                    error: "Empty message"
+                });
+
+                return;
+            }
+
+
+            /*
+            ------------------------------------------------
+            /color
+            ------------------------------------------------
+            */
+
+            if (
+                text.toLowerCase() === "/color"
+            ) {
+                const color = randomColor();
+
+                player.color = color;
+
+                broadcast(
+                    player.room,
+                    {
+                        type:
+                            "playerColorChanged",
+                        playerId:
+                            player.id,
+                        color:
+                            color
+                    }
+                );
+
+                sendJSON(res, 200, {
+                    ok: true
+                });
+
+                return;
+            }
+
+
+            /*
+            ------------------------------------------------
+            /color NAME
+            ------------------------------------------------
+            */
+
+            if (
+                text.toLowerCase()
+                    .indexOf("/color ") === 0
+            ) {
+                const color = getColor(
+                    text.substring(7)
+                );
+
+                if (!color) {
+                    addEvent(
+                        client.id,
+                        {
+                            type:
+                                "systemMessage",
+                            text:
+                                "Invalid color."
+                        }
+                    );
+
+                    sendJSON(res, 200, {
+                        ok: true
+                    });
+
+                    return;
+                }
+
+                player.color = color;
+
+                broadcast(
+                    player.room,
+                    {
+                        type:
+                            "playerColorChanged",
+                        playerId:
+                            player.id,
+                        color:
+                            color
+                    }
+                );
+
+                sendJSON(res, 200, {
+                    ok: true
+                });
+
+                return;
+            }
+
+
+            /*
+            ------------------------------------------------
+            /char
+            ------------------------------------------------
+            */
+
+            if (
+                text.toLowerCase() === "/char"
+            ) {
+                player.character =
+                    player.character === "bonzi"
+                        ? "square"
+                        : "bonzi";
+
+                broadcast(
+                    player.room,
+                    {
+                        type:
+                            "playerCharacterChanged",
+                        playerId:
+                            player.id,
+                        character:
+                            player.character
+                    }
+                );
+
+                sendJSON(res, 200, {
+                    ok: true
+                });
+
+                return;
+            }
+
+
+            /*
+            ------------------------------------------------
+            /char bonzi
+            ------------------------------------------------
+            */
+
+            if (
+                text.toLowerCase() ===
+                "/char bonzi"
+            ) {
+                player.character = "bonzi";
+
+                broadcast(
+                    player.room,
+                    {
+                        type:
+                            "playerCharacterChanged",
+                        playerId:
+                            player.id,
+                        character:
+                            "bonzi"
+                    }
+                );
+
+                sendJSON(res, 200, {
+                    ok: true
+                });
+
+                return;
+            }
+
+
+            /*
+            ------------------------------------------------
+            /char square
+            ------------------------------------------------
+            */
+
+            if (
+                text.toLowerCase() ===
+                "/char square"
+            ) {
+                player.character = "square";
+
+                broadcast(
+                    player.room,
+                    {
+                        type:
+                            "playerCharacterChanged",
+                        playerId:
+                            player.id,
+                        character:
+                            "square"
+                    }
+                );
+
+                sendJSON(res, 200, {
+                    ok: true
+                });
+
+                return;
+            }
+
+
+            /*
+            ------------------------------------------------
+            NORMAL MESSAGE
+            ------------------------------------------------
+            */
+
+            broadcast(
+                player.room,
+                {
+                    type: "message",
+                    playerId: player.id,
+                    name: player.name,
+                    text: text
+                }
+            );
+
+            sendJSON(res, 200, {
+                ok: true
+            });
+        });
+
+        return;
+    }
+
+
+    /*
+    ========================================================
+    MOVE
+    ========================================================
+    */
+
+    if (
+        pathname === "/api/move" &&
+        req.method === "POST"
+    ) {
+        parseBody(req, function (body) {
+            const sender = clients[body.senderId];
+
+            if (!sender) {
+                sendJSON(res, 400, {
+                    error: "Invalid sender"
+                });
+
+                return;
+            }
+
+            sender.lastSeen = Date.now();
+
+            const player = players[body.playerId];
+
+            if (!player) {
+                sendJSON(res, 400, {
+                    error: "Player not found"
+                });
+
+                return;
+            }
+
+            if (
+                player.room !==
+                sender.room
+            ) {
+                sendJSON(res, 403, {
+                    error: "Different room"
+                });
+
+                return;
+            }
+
+            player.x = clamp(body.x, 2, 98);
+            player.y = clamp(body.y, 2, 98);
+
+            broadcast(
+                player.room,
+                {
+                    type: "playerMoved",
+                    playerId: player.id,
+                    x: player.x,
+                    y: player.y
+                }
+            );
+
+            sendJSON(res, 200, {
+                ok: true
+            });
+        });
+
+        return;
+    }
+
+
+    /*
+    ========================================================
+    LEAVE
+    ========================================================
+    */
+
+    if (
+        pathname === "/api/leave" &&
+        req.method === "POST"
+    ) {
+        parseBody(req, function (body) {
+            if (clients[body.id]) {
+                removeClient(body.id);
+            }
+
+            sendJSON(res, 200, {
+                ok: true
+            });
+        });
+
+        return;
+    }
+
+
+    /*
+    ========================================================
+    STATIC FILE
+    ========================================================
+    */
+
+    if (req.method === "GET") {
+        serveFile(
+            req,
+            res,
+            pathname
+        );
+
+        return;
+    }
+
+    sendJSON(res, 404, {
+        error: "Not found"
+    });
+});
 
 
 /*
 ============================================================
-CLEANUP
+DISCONNECT / TIMEOUT CLEANUP
 ============================================================
 */
 
-setInterval(
-    function () {
-        var id;
-        var client;
-        var now;
+setInterval(function () {
+    const now = Date.now();
+    let id;
 
-        now =
-            Date.now();
-
-        for (
-            id in clients
-        ) {
-            if (
-                !clients.hasOwnProperty(
-                    id
-                )
-            ) {
-                continue;
-            }
-
-            client =
-                clients[id];
-
-            if (
-                client.lastSeen &&
-                now -
-                    client.lastSeen >
-                    120000
-            ) {
-                removeClient(
-                    client
-                );
-            }
+    for (id in clients) {
+        if (!Object.prototype.hasOwnProperty.call(clients, id)) {
+            continue;
         }
-    },
-    30000
-);
+
+        if (
+            now -
+            clients[id].lastSeen >
+            120000
+        ) {
+            removeClient(id);
+        }
+    }
+}, 30000);
 
 
 /*
@@ -1428,7 +1027,7 @@ server.listen(
     "0.0.0.0",
     function () {
         console.log(
-            "Legacy chat server listening on port " +
+            "Chat server running on port " +
             PORT
         );
     }
