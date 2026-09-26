@@ -10,17 +10,24 @@ var dragging = false;
 var pollTimer = null;
 var pollInProgress = false;
 
-var loginScreen;
-var desktop;
-var nameInput;
-var roomInput;
-var submitButton;
-var world;
-var messageInput;
-var startButton;
-var settingsButton;
-var settingsPanel;
-var closeSettings;
+var loginScreen = null;
+var desktop = null;
+var nameInput = null;
+var roomInput = null;
+var submitButton = null;
+var world = null;
+var messageInput = null;
+var startButton = null;
+var settingsButton = null;
+var settingsPanel = null;
+var closeSettings = null;
+
+
+/*
+============================================================
+DOM
+============================================================
+*/
 
 function $(id) {
     return document.getElementById(id);
@@ -32,9 +39,16 @@ function addEvent(element, name, handler) {
     }
 
     if (element.attachEvent) {
-        element.attachEvent("on" + name, handler);
+        element.attachEvent(
+            "on" + name,
+            handler
+        );
     } else if (element.addEventListener) {
-        element.addEventListener(name, handler, false);
+        element.addEventListener(
+            name,
+            handler,
+            false
+        );
     }
 }
 
@@ -58,64 +72,183 @@ function stopEvent(event) {
     event.cancelBubble = true;
 }
 
-function ajax(method, address, data, callback) {
-    var xhr = new XMLHttpRequest();
-    var body = "";
+
+/*
+============================================================
+JSON COMPATIBILITY
+============================================================
+*/
+
+function parseJSON(text) {
+    if (
+        window.JSON &&
+        JSON.parse
+    ) {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /*
+     * IE7 fallback.
+     *
+     * The server only sends JSON that it
+     * generated itself.
+     */
+
+    try {
+        return eval(
+            "(" + text + ")"
+        );
+    } catch (e2) {
+        return null;
+    }
+}
+
+
+/*
+============================================================
+AJAX
+============================================================
+*/
+
+function ajax(
+    method,
+    address,
+    data,
+    callback
+) {
+    var xhr;
+    var body;
     var key;
+    var completed = false;
+
+    xhr =
+        new XMLHttpRequest();
+
+    body = "";
 
     if (data) {
         for (key in data) {
-            if (data.hasOwnProperty(key)) {
-                if (body !== "") {
-                    body += "&";
-                }
-
-                body += encodeURIComponent(key);
-                body += "=";
-                body += encodeURIComponent(data[key]);
+            if (
+                !data.hasOwnProperty(
+                    key
+                )
+            ) {
+                continue;
             }
+
+            if (body !== "") {
+                body += "&";
+            }
+
+            body +=
+                encodeURIComponent(
+                    key
+                );
+
+            body += "=";
+
+            body +=
+                encodeURIComponent(
+                    data[key]
+                );
         }
     }
 
-    xhr.open(method, address, true);
+    try {
+        xhr.open(
+            method,
+            address,
+            true
+        );
+    } catch (e) {
+        if (callback) {
+            callback(null);
+        }
+
+        return;
+    }
 
     if (method === "POST") {
-        xhr.setRequestHeader(
-            "Content-Type",
-            "application/x-www-form-urlencoded"
-        );
+        try {
+            xhr.setRequestHeader(
+                "Content-Type",
+                "application/x-www-form-urlencoded"
+            );
+        } catch (e2) {}
     }
 
-    xhr.onreadystatechange = function () {
-        var result;
+    xhr.onreadystatechange =
+        function () {
+            var result;
 
-        if (xhr.readyState !== 4) {
-            return;
-        }
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-                result = JSON.parse(xhr.responseText);
-            } catch (e) {
-                result = null;
+            if (
+                xhr.readyState !== 4
+            ) {
+                return;
             }
 
-            if (callback) {
-                callback(result);
+            if (completed) {
+                return;
             }
-        } else {
+
+            completed = true;
+
+            if (
+                xhr.status >= 200 &&
+                xhr.status < 300
+            ) {
+                result =
+                    parseJSON(
+                        xhr.responseText
+                    );
+
+                if (callback) {
+                    callback(result);
+                }
+            } else {
+                if (callback) {
+                    callback(null);
+                }
+            }
+        };
+
+    try {
+        xhr.send(
+            method === "POST"
+                ? body
+                : null
+        );
+    } catch (e3) {
+        if (!completed) {
+            completed = true;
+
             if (callback) {
                 callback(null);
             }
         }
-    };
-
-    xhr.send(body);
+    }
 }
 
+
+/*
+============================================================
+LOGIN
+============================================================
+*/
+
 function joinRoom() {
-    var name = nameInput.value;
-    var room = roomInput.value;
+    var name;
+    var room;
+
+    name =
+        nameInput.value;
+
+    room =
+        roomInput.value;
 
     if (!name) {
         name = "Anonymous";
@@ -128,7 +261,8 @@ function joinRoom() {
     myName = name;
     currentRoom = room;
 
-    submitButton.disabled = true;
+    submitButton.disabled =
+        true;
 
     ajax(
         "POST",
@@ -140,79 +274,155 @@ function joinRoom() {
         function (result) {
             var i;
 
-            submitButton.disabled = false;
+            submitButton.disabled =
+                false;
 
-            if (!result || !result.id) {
-                alert("Could not connect to the chat server.");
+            if (
+                !result ||
+                !result.id ||
+                !result.player
+            ) {
+                alert(
+                    "Could not connect to the chat server."
+                );
+
                 return;
             }
 
-            myId = String(result.id);
+            myId =
+                String(
+                    result.id
+                );
 
-            loginScreen.style.display = "none";
-            desktop.style.display = "block";
+            currentRoom =
+                result.player.room;
 
-            createPlayer(result.player);
+            loginScreen.style.display =
+                "none";
 
-            if (result.player) {
-                currentRoom = result.player.room;
+            desktop.style.display =
+                "block";
+
+            createPlayer(
+                result.player
+            );
+
+            if (
+                result.events &&
+                result.events.length
+            ) {
+                for (
+                    i = 0;
+                    i <
+                    result.events.length;
+                    i++
+                ) {
+                    handleEvent(
+                        result.events[i]
+                    );
+                }
             }
 
             startPolling();
-
-            for (i = 0; i < result.events.length; i++) {
-                handleEvent(result.events[i]);
-            }
         }
     );
 }
 
+
+/*
+============================================================
+POLLING
+============================================================
+*/
+
 function startPolling() {
     if (pollTimer) {
-        window.clearTimeout(pollTimer);
+        window.clearTimeout(
+            pollTimer
+        );
     }
 
     poll();
 }
 
 function poll() {
-    if (!myId || pollInProgress) {
+    if (
+        !myId ||
+        pollInProgress
+    ) {
         return;
     }
 
-    pollInProgress = true;
+    pollInProgress =
+        true;
 
     ajax(
         "GET",
-        "/api/poll?id=" + encodeURIComponent(myId) + "&t=" + new Date().getTime(),
+        "/api/poll?id=" +
+        encodeURIComponent(
+            myId
+        ) +
+        "&t=" +
+        new Date().getTime(),
         null,
         function (result) {
             var i;
 
-            pollInProgress = false;
+            pollInProgress =
+                false;
 
-            if (result && result.events) {
-                for (i = 0; i < result.events.length; i++) {
-                    handleEvent(result.events[i]);
+            if (
+                result &&
+                result.events
+            ) {
+                for (
+                    i = 0;
+                    i <
+                    result.events.length;
+                    i++
+                ) {
+                    handleEvent(
+                        result.events[i]
+                    );
                 }
             }
 
-            pollTimer = window.setTimeout(poll, 20);
+            pollTimer =
+                window.setTimeout(
+                    poll,
+                    20
+                );
         }
     );
 }
+
+
+/*
+============================================================
+EVENTS
+============================================================
+*/
 
 function handleEvent(event) {
     if (!event) {
         return;
     }
 
-    if (event.event === "playerJoined") {
-        createPlayer(event.data);
+    if (
+        event.event ===
+        "playerJoined"
+    ) {
+        createPlayer(
+            event.data
+        );
+
         return;
     }
 
-    if (event.event === "playerMoved") {
+    if (
+        event.event ===
+        "playerMoved"
+    ) {
         movePlayer(
             event.data.id,
             event.data.x,
@@ -222,7 +432,10 @@ function handleEvent(event) {
         return;
     }
 
-    if (event.event === "playerColorChanged") {
+    if (
+        event.event ===
+        "playerColorChanged"
+    ) {
         changePlayerColor(
             event.data.id,
             event.data.color
@@ -231,7 +444,10 @@ function handleEvent(event) {
         return;
     }
 
-    if (event.event === "playerCharacterChanged") {
+    if (
+        event.event ===
+        "playerCharacterChanged"
+    ) {
         changePlayerCharacter(
             event.data.id,
             event.data.character
@@ -240,12 +456,21 @@ function handleEvent(event) {
         return;
     }
 
-    if (event.event === "playerLeft") {
-        removePlayer(event.data.id);
+    if (
+        event.event ===
+        "playerLeft"
+    ) {
+        removePlayer(
+            event.data.id
+        );
+
         return;
     }
 
-    if (event.event === "message") {
+    if (
+        event.event ===
+        "message"
+    ) {
         showMessage(
             event.data.id,
             event.data.text
@@ -254,10 +479,22 @@ function handleEvent(event) {
         return;
     }
 
-    if (event.event === "systemMessage") {
-        showSystemMessage(event.data.text);
+    if (
+        event.event ===
+        "systemMessage"
+    ) {
+        showSystemMessage(
+            event.data.text
+        );
     }
 }
+
+
+/*
+============================================================
+PLAYERS
+============================================================
+*/
 
 function createPlayer(data) {
     var player;
@@ -265,128 +502,262 @@ function createPlayer(data) {
     var name;
     var character;
 
-    if (!data || !data.id) {
+    if (
+        !data ||
+        !data.id
+    ) {
         return;
     }
 
-    if (players[String(data.id)]) {
+    if (
+        players[
+            String(data.id)
+        ]
+    ) {
         return;
     }
 
     player = {
-        id: String(data.id),
-        name: data.name || "Anonymous",
-        room: data.room || currentRoom,
-        x: parseFloat(data.x),
-        y: parseFloat(data.y),
-        color: data.color || "#8800ff",
-        character: data.character || "bonzi",
+        id:
+            String(data.id),
+
+        name:
+            data.name ||
+            "Anonymous",
+
+        room:
+            data.room ||
+            currentRoom,
+
+        x:
+            parseFloat(
+                data.x
+            ),
+
+        y:
+            parseFloat(
+                data.y
+            ),
+
+        color:
+            data.color ||
+            "#8800ff",
+
+        character:
+            data.character ||
+            "bonzi",
+
         element: null,
-        bubble: null,
-        audio: null
+        bubble: null
     };
 
-    element = document.createElement("div");
-    element.className = "player";
-
-    if (player.character === "bonzi") {
-        element.className += " bonziPlayer";
+    if (isNaN(player.x)) {
+        player.x = 50;
     }
 
-    name = document.createElement("div");
-    name.className = "playerName";
+    if (isNaN(player.y)) {
+        player.y = 50;
+    }
+
+    element =
+        document.createElement(
+            "div"
+        );
+
+    element.className =
+        "player";
+
+    if (
+        player.character ===
+        "bonzi"
+    ) {
+        element.className +=
+            " bonziPlayer";
+    }
+
+    name =
+        document.createElement(
+            "div"
+        );
+
+    name.className =
+        "playerName";
+
     name.appendChild(
-        document.createTextNode(player.name)
+        document.createTextNode(
+            player.name
+        )
     );
 
-    element.appendChild(name);
+    element.appendChild(
+        name
+    );
 
-    if (player.character === "bonzi") {
-        character = document.createElement("img");
+    if (
+        player.character ===
+        "bonzi"
+    ) {
+        character =
+            document.createElement(
+                "img"
+            );
 
-        character.className = "bonziCharacter";
-        character.src = "/bonzi.png";
+        character.className =
+            "bonziCharacter";
+
+        character.src =
+            "/bonzi.png";
+
         character.alt = "";
 
-        element.appendChild(character);
+        element.appendChild(
+            character
+        );
     } else {
-        character = document.createElement("div");
-        character.className = "squareCharacter";
+        character =
+            document.createElement(
+                "div"
+            );
 
-        element.appendChild(character);
+        character.className =
+            "squareCharacter";
+
+        element.appendChild(
+            character
+        );
     }
 
-    player.element = element;
+    player.element =
+        element;
 
-    world.appendChild(element);
+    world.appendChild(
+        element
+    );
 
-    players[player.id] = player;
+    players[player.id] =
+        player;
 
-    updatePlayerPosition(player);
-    updatePlayerColor(player);
-    setupDragging(player);
+    updatePlayerPosition(
+        player
+    );
+
+    updatePlayerColor(
+        player
+    );
+
+    setupDragging(
+        player
+    );
 }
 
-function updatePlayerPosition(player) {
-    if (!player || !player.element) {
+function updatePlayerPosition(
+    player
+) {
+    if (
+        !player ||
+        !player.element
+    ) {
         return;
     }
 
-    player.element.style.left = player.x + "%";
-    player.element.style.top = player.y + "%";
+    player.element.style.left =
+        player.x + "%";
+
+    player.element.style.top =
+        player.y + "%";
 }
 
-function movePlayer(id, x, y) {
+function movePlayer(
+    id,
+    x,
+    y
+) {
     var player;
 
-    id = String(id);
-
-    player = players[id];
+    player =
+        players[
+            String(id)
+        ];
 
     if (!player) {
         return;
     }
 
-    player.x = parseFloat(x);
-    player.y = parseFloat(y);
+    player.x =
+        parseFloat(x);
 
-    updatePlayerPosition(player);
+    player.y =
+        parseFloat(y);
+
+    updatePlayerPosition(
+        player
+    );
 }
 
-function setupDragging(player) {
-    var element = player.element;
 
-    addEvent(element, "mousedown", function (event) {
-        beginDrag(player, event);
-    });
+/*
+============================================================
+DRAGGING
+============================================================
+*/
 
-    addEvent(element, "touchstart", function (event) {
-        beginDrag(player, event);
-    });
+function setupDragging(
+    player
+) {
+    var element;
 
-    addEvent(element, "pointerdown", function (event) {
-        beginDrag(player, event);
-    });
+    element =
+        player.element;
+
+    addEvent(
+        element,
+        "mousedown",
+        function (event) {
+            beginDrag(
+                player,
+                event
+            );
+        }
+    );
+
+    addEvent(
+        element,
+        "touchstart",
+        function (event) {
+            beginDrag(
+                player,
+                event
+            );
+        }
+    );
+
+    addEvent(
+        element,
+        "pointerdown",
+        function (event) {
+            beginDrag(
+                player,
+                event
+            );
+        }
+    );
 }
 
-function getPointerPosition(event) {
-    var x;
-    var y;
+function getPointerPosition(
+    event
+) {
     var touch;
 
-    event = event || window.event;
+    event =
+        event ||
+        window.event;
 
-    if (event.touches && event.touches.length) {
-        touch = event.touches[0];
-
-        return {
-            x: touch.clientX,
-            y: touch.clientY
-        };
-    }
-
-    if (event.changedTouches && event.changedTouches.length) {
-        touch = event.changedTouches[0];
+    if (
+        event.touches &&
+        event.touches.length
+    ) {
+        touch =
+            event.touches[0];
 
         return {
             x: touch.clientX,
@@ -394,74 +765,122 @@ function getPointerPosition(event) {
         };
     }
 
-    x = event.clientX;
-    y = event.clientY;
+    if (
+        event.changedTouches &&
+        event.changedTouches.length
+    ) {
+        touch =
+            event.changedTouches[0];
+
+        return {
+            x: touch.clientX,
+            y: touch.clientY
+        };
+    }
 
     return {
-        x: x,
-        y: y
+        x: event.clientX,
+        y: event.clientY
     };
 }
 
-function beginDrag(player, event) {
+function beginDrag(
+    player,
+    event
+) {
     if (!player) {
         return;
     }
 
-    event = event || window.event;
+    draggingPlayer =
+        player;
 
-    draggingPlayer = player;
-    dragging = true;
+    dragging =
+        true;
 
     preventDefault(event);
     stopEvent(event);
 }
 
 function dragMove(event) {
-    var worldRect;
     var pointer;
+    var rect;
     var x;
     var y;
 
-    if (!dragging || !draggingPlayer) {
+    if (
+        !dragging ||
+        !draggingPlayer
+    ) {
         return;
     }
 
-    event = event || window.event;
+    pointer =
+        getPointerPosition(
+            event
+        );
 
-    pointer = getPointerPosition(event);
+    rect =
+        world.getBoundingClientRect();
 
-    worldRect = {
-        left: world.offsetLeft,
-        top: world.offsetTop,
-        width: world.clientWidth,
-        height: world.clientHeight
-    };
+    x =
+        (
+            pointer.x -
+            rect.left
+        ) /
+        rect.width *
+        100;
 
-    x = ((pointer.x - worldRect.left) / worldRect.width) * 100;
-    y = ((pointer.y - worldRect.top) / worldRect.height) * 100;
+    y =
+        (
+            pointer.y -
+            rect.top
+        ) /
+        rect.height *
+        100;
 
-    x = Math.max(2, Math.min(98, x));
-    y = Math.max(2, Math.min(98, y));
+    x = Math.max(
+        2,
+        Math.min(
+            98,
+            x
+        )
+    );
 
-    draggingPlayer.x = x;
-    draggingPlayer.y = y;
+    y = Math.max(
+        2,
+        Math.min(
+            98,
+            y
+        )
+    );
 
-    updatePlayerPosition(draggingPlayer);
+    draggingPlayer.x =
+        x;
+
+    draggingPlayer.y =
+        y;
+
+    updatePlayerPosition(
+        draggingPlayer
+    );
 
     ajax(
         "POST",
         "/api/move",
         {
             senderId: myId,
-            playerId: draggingPlayer.id,
+            playerId:
+                draggingPlayer.id,
             x: x,
             y: y
         },
         null
     );
 
-    preventDefault(event);
+    preventDefault(
+        event
+    );
 }
 
 function endDrag(event) {
@@ -469,76 +888,176 @@ function endDrag(event) {
         return;
     }
 
-    dragging = false;
-    draggingPlayer = null;
+    dragging =
+        false;
 
-    event = event || window.event;
+    draggingPlayer =
+        null;
 
-    preventDefault(event);
+    preventDefault(
+        event
+    );
 }
 
-function changePlayerColor(id, color) {
+
+/*
+============================================================
+COLORS
+============================================================
+*/
+
+function changePlayerColor(
+    id,
+    color
+) {
     var player;
 
-    player = players[String(id)];
+    player =
+        players[
+            String(id)
+        ];
 
     if (!player) {
         return;
     }
 
-    player.color = color;
+    player.color =
+        color;
 
-    updatePlayerColor(player);
+    updatePlayerColor(
+        player
+    );
 }
 
-function colorToHue(color) {
-    var named = {
-        red: 0,
-        orange: 30,
-        yellow: 60,
-        green: 120,
-        cyan: 180,
-        blue: 240,
-        purple: 270,
-        magenta: 300,
-        pink: 330
-    };
-
+function colorToHue(
+    color
+) {
     var r;
     var g;
     var b;
     var max;
     var min;
     var h;
-    var parts;
 
-    color = String(color).toLowerCase();
+    color =
+        String(color)
+            .toLowerCase();
 
-    if (named[color] !== undefined) {
-        return named[color];
+    if (
+        color === "red"
+    ) {
+        return 0;
     }
 
-    if (color.charAt(0) !== "#" || color.length !== 7) {
+    if (
+        color === "orange"
+    ) {
+        return 30;
+    }
+
+    if (
+        color === "yellow"
+    ) {
+        return 60;
+    }
+
+    if (
+        color === "green"
+    ) {
+        return 120;
+    }
+
+    if (
+        color === "cyan"
+    ) {
+        return 180;
+    }
+
+    if (
+        color === "blue"
+    ) {
+        return 240;
+    }
+
+    if (
+        color === "purple"
+    ) {
         return 270;
     }
 
-    r = parseInt(color.substring(1, 3), 16) / 255;
-    g = parseInt(color.substring(3, 5), 16) / 255;
-    b = parseInt(color.substring(5, 7), 16) / 255;
+    if (
+        color === "magenta"
+    ) {
+        return 300;
+    }
 
-    max = Math.max(r, g, b);
-    min = Math.min(r, g, b);
+    if (
+        color === "pink"
+    ) {
+        return 330;
+    }
+
+    if (
+        color.charAt(0) !== "#" ||
+        color.length !== 7
+    ) {
+        return 270;
+    }
+
+    r =
+        parseInt(
+            color.substring(1, 3),
+            16
+        ) / 255;
+
+    g =
+        parseInt(
+            color.substring(3, 5),
+            16
+        ) / 255;
+
+    b =
+        parseInt(
+            color.substring(5, 7),
+            16
+        ) / 255;
+
+    max =
+        Math.max(
+            r,
+            g,
+            b
+        );
+
+    min =
+        Math.min(
+            r,
+            g,
+            b
+        );
 
     if (max === min) {
         return 0;
     }
 
     if (max === r) {
-        h = ((g - b) / (max - min)) % 6;
+        h =
+            (
+                (g - b) /
+                (max - min)
+            ) % 6;
     } else if (max === g) {
-        h = ((b - r) / (max - min)) + 2;
+        h =
+            (
+                (b - r) /
+                (max - min)
+            ) + 2;
     } else {
-        h = ((r - g) / (max - min)) + 4;
+        h =
+            (
+                (r - g) /
+                (max - min)
+            ) + 4;
     }
 
     h *= 60;
@@ -550,276 +1069,439 @@ function colorToHue(color) {
     return h;
 }
 
-function updatePlayerColor(player) {
+function updatePlayerColor(
+    player
+) {
     var elements;
+    var images;
     var i;
     var hue;
     var shift;
 
-    if (!player || !player.element) {
+    if (
+        !player ||
+        !player.element
+    ) {
         return;
     }
 
-    elements = player.element.getElementsByTagName("div");
+    elements =
+        player.element
+            .getElementsByTagName(
+                "div"
+            );
 
-    hue = colorToHue(player.color);
-
-    shift = hue - 270;
-
-    for (i = 0; i < elements.length; i++) {
-        if (elements[i].className === "squareCharacter") {
-            elements[i].style.backgroundColor = player.color;
+    for (
+        i = 0;
+        i < elements.length;
+        i++
+    ) {
+        if (
+            elements[i].className ===
+            "squareCharacter"
+        ) {
+            elements[i].style
+                .backgroundColor =
+                player.color;
         }
     }
 
-    /*
-     * IE7-IE11 do not support CSS variables.
-     * The Bonzi image therefore uses an IE-compatible
-     * filter when available.
-     */
+    images =
+        player.element
+            .getElementsByTagName(
+                "img"
+            );
 
-    var images = player.element.getElementsByTagName("img");
+    hue =
+        colorToHue(
+            player.color
+        );
 
-    for (i = 0; i < images.length; i++) {
-        if (images[i].className === "bonziCharacter") {
-            if (images[i].style.filter !== undefined) {
-                images[i].style.filter =
-                    "hue-rotate(" + shift + "deg)";
-            }
+    shift =
+        hue - 270;
 
-            if (images[i].style.msFilter !== undefined) {
-                images[i].style.msFilter =
-                    "hue-rotate(" + shift + "deg)";
-            }
+    for (
+        i = 0;
+        i < images.length;
+        i++
+    ) {
+        if (
+            images[i].className ===
+            "bonziCharacter"
+        ) {
+            images[i].style.filter =
+                "hue-rotate(" +
+                shift +
+                "deg)";
+
+            images[i].style.msFilter =
+                "hue-rotate(" +
+                shift +
+                "deg)";
         }
     }
 }
 
-function changePlayerCharacter(id, character) {
+
+/*
+============================================================
+CHARACTER
+============================================================
+*/
+
+function changePlayerCharacter(
+    id,
+    character
+) {
     var player;
-    var oldImages;
-    var oldSquares;
     var name;
     var image;
     var square;
 
-    player = players[String(id)];
+    player =
+        players[
+            String(id)
+        ];
 
     if (!player) {
         return;
     }
 
-    player.character = character;
+    player.character =
+        character;
 
-    while (player.element.childNodes.length > 0) {
+    while (
+        player.element.childNodes.length
+    ) {
         player.element.removeChild(
-            player.element.childNodes[
-                player.element.childNodes.length - 1
-            ]
+            player.element
+                .childNodes[0]
         );
     }
 
-    name = document.createElement("div");
-    name.className = "playerName";
+    name =
+        document.createElement(
+            "div"
+        );
+
+    name.className =
+        "playerName";
+
     name.appendChild(
-        document.createTextNode(player.name)
+        document.createTextNode(
+            player.name
+        )
     );
 
-    player.element.appendChild(name);
+    player.element.appendChild(
+        name
+    );
 
-    if (character === "bonzi") {
-        player.element.className = "player bonziPlayer";
+    if (
+        character ===
+        "bonzi"
+    ) {
+        player.element.className =
+            "player bonziPlayer";
 
-        image = document.createElement("img");
-        image.className = "bonziCharacter";
-        image.src = "/bonzi.png";
+        image =
+            document.createElement(
+                "img"
+            );
+
+        image.className =
+            "bonziCharacter";
+
+        image.src =
+            "/bonzi.png";
+
         image.alt = "";
 
-        player.element.appendChild(image);
+        player.element.appendChild(
+            image
+        );
     } else {
-        player.element.className = "player";
+        player.element.className =
+            "player";
 
-        square = document.createElement("div");
-        square.className = "squareCharacter";
+        square =
+            document.createElement(
+                "div"
+            );
 
-        player.element.appendChild(square);
+        square.className =
+            "squareCharacter";
+
+        player.element.appendChild(
+            square
+        );
     }
 
-    updatePlayerPosition(player);
-    updatePlayerColor(player);
+    updatePlayerPosition(
+        player
+    );
+
+    updatePlayerColor(
+        player
+    );
+
+    setupDragging(
+        player
+    );
 }
 
-function removePlayer(id) {
+
+/*
+============================================================
+REMOVE PLAYER
+============================================================
+*/
+
+function removePlayer(
+    id
+) {
     var player;
 
-    player = players[String(id)];
+    player =
+        players[
+            String(id)
+        ];
 
     if (!player) {
         return;
     }
 
-    if (player.audio) {
-        try {
-            player.audio.pause();
-        } catch (e) {}
-
-        player.audio = null;
+    if (
+        player.bubble &&
+        player.bubble.parentNode
+    ) {
+        player.bubble.parentNode
+            .removeChild(
+                player.bubble
+            );
     }
 
-    if (player.bubble && player.bubble.parentNode) {
-        player.bubble.parentNode.removeChild(player.bubble);
+    if (
+        player.element &&
+        player.element.parentNode
+    ) {
+        player.element.parentNode
+            .removeChild(
+                player.element
+            );
     }
 
-    if (player.element && player.element.parentNode) {
-        player.element.parentNode.removeChild(player.element);
-    }
-
-    delete players[String(id)];
+    delete players[
+        String(id)
+    ];
 }
 
-function showMessage(id, text) {
+
+/*
+============================================================
+MESSAGE
+============================================================
+*/
+
+function showMessage(
+    id,
+    text
+) {
     var player;
 
-    player = players[String(id)];
+    player =
+        players[
+            String(id)
+        ];
 
     if (!player) {
         return;
     }
 
-    showSpeechBubble(player, text);
-    generateSpeech(player, text);
+    showSpeechBubble(
+        player,
+        text
+    );
+
+    speakText(
+        text
+    );
 }
 
-function showSpeechBubble(player, text) {
+
+/*
+============================================================
+SPEECH BUBBLE
+============================================================
+*/
+
+function showSpeechBubble(
+    player,
+    text
+) {
     var bubble;
     var arrow;
     var inner;
 
-    if (player.bubble && player.bubble.parentNode) {
-        player.bubble.parentNode.removeChild(
-            player.bubble
-        );
+    if (
+        player.bubble &&
+        player.bubble.parentNode
+    ) {
+        player.bubble.parentNode
+            .removeChild(
+                player.bubble
+            );
     }
 
-    bubble = document.createElement("div");
-    bubble.className = "speechBubble";
+    bubble =
+        document.createElement(
+            "div"
+        );
+
+    bubble.className =
+        "speechBubble";
 
     bubble.appendChild(
-        document.createTextNode(text)
+        document.createTextNode(
+            text
+        )
     );
 
-    arrow = document.createElement("div");
-    arrow.className = "speechBubbleArrow";
+    arrow =
+        document.createElement(
+            "div"
+        );
 
-    inner = document.createElement("div");
-    inner.className = "speechBubbleArrowInner";
+    arrow.className =
+        "speechBubbleArrow";
 
-    arrow.appendChild(inner);
-    bubble.appendChild(arrow);
+    inner =
+        document.createElement(
+            "div"
+        );
 
-    player.element.appendChild(bubble);
+    inner.className =
+        "speechBubbleArrowInner";
 
-    player.bubble = bubble;
+    arrow.appendChild(
+        inner
+    );
 
-    window.setTimeout(function () {
-        if (
-            player.bubble === bubble &&
-            bubble.parentNode
-        ) {
-            bubble.parentNode.removeChild(bubble);
-            player.bubble = null;
-        }
-    }, 5000);
+    bubble.appendChild(
+        arrow
+    );
+
+    player.element.appendChild(
+        bubble
+    );
+
+    player.bubble =
+        bubble;
+
+    window.setTimeout(
+        function () {
+            if (
+                player.bubble ===
+                bubble &&
+                bubble.parentNode
+            ) {
+                bubble.parentNode
+                    .removeChild(
+                        bubble
+                    );
+
+                player.bubble =
+                    null;
+            }
+        },
+        5000
+    );
 }
 
-function generateSpeech(player, text) {
-    var xhr;
-    var audio;
-    var result;
 
-    /*
-     * HTML5 audio is intentionally used here.
-     *
-     * IE7 and IE8 do not have HTML5 audio, so those
-     * browsers simply receive the chat message without
-     * spoken playback.
-     */
+/*
+============================================================
+eSPEAK JAVASCRIPT
+============================================================
+*/
 
-    if (!document.createElement("audio").canPlayType) {
+function speakText(text) {
+    var safeText;
+
+    safeText =
+        String(text);
+
+    if (!safeText) {
         return;
     }
 
-    xhr = new XMLHttpRequest();
+    /*
+     * speakClient.js normally exposes
+     * the global speak() function.
+     */
 
-    xhr.open(
-        "GET",
-        "/api/tts?text=" + encodeURIComponent(text),
-        true
-    );
-
-    xhr.onreadystatechange = function () {
-        if (xhr.readyState !== 4) {
-            return;
-        }
-
-        if (xhr.status < 200 || xhr.status >= 300) {
-            return;
-        }
-
+    if (
+        typeof window.speak ===
+        "function"
+    ) {
         try {
-            result = JSON.parse(xhr.responseText);
+            window.speak(
+                safeText
+            );
         } catch (e) {
-            return;
+            if (window.console) {
+                try {
+                    window.console.log(
+                        "eSpeak error:",
+                        e
+                    );
+                } catch (e2) {}
+            }
         }
 
-        if (!result || !result.url) {
-            return;
-        }
+        return;
+    }
 
-        audio = document.createElement("audio");
+    /*
+     * Some versions expose the
+     * generator differently.
+     */
 
-        audio.className = "ttsAudio";
-        audio.setAttribute("preload", "auto");
-
-        audio.src = result.url;
-
-        /*
-         * Do not cancel other people's audio.
-         * Every message gets its own HTML5 audio element.
-         */
-
-        document.body.appendChild(audio);
-
-        player.audio = audio;
-
+    if (
+        typeof window.speakGenerator ===
+        "function"
+    ) {
         try {
-            audio.play();
-        } catch (e) {}
-
-        addEvent(audio, "ended", function () {
-            if (audio.parentNode) {
-                audio.parentNode.removeChild(audio);
-            }
-
-            if (player.audio === audio) {
-                player.audio = null;
-            }
-        });
-    };
-
-    xhr.send(null);
+            window.speakGenerator(
+                safeText
+            );
+        } catch (e3) {}
+    }
 }
+
+
+/*
+============================================================
+SEND
+============================================================
+*/
 
 function sendMessage() {
     var text;
 
-    text = messageInput.value;
+    if (!myId) {
+        return;
+    }
+
+    text =
+        messageInput.value;
 
     if (!text) {
         return;
     }
 
-    messageInput.value = "";
+    messageInput.value =
+        "";
 
     ajax(
         "POST",
@@ -832,102 +1514,244 @@ function sendMessage() {
     );
 }
 
-function showSystemMessage(text) {
+
+/*
+============================================================
+SYSTEM MESSAGE
+============================================================
+*/
+
+function showSystemMessage(
+    text
+) {
     if (window.console) {
         try {
-            console.log(text);
+            window.console.log(
+                text
+            );
         } catch (e) {}
     }
 }
 
+
+/*
+============================================================
+SETTINGS
+============================================================
+*/
+
 function initialize() {
-    loginScreen = $("loginScreen");
-    desktop = $("desktop");
+    loginScreen =
+        $("loginScreen");
 
-    nameInput = $("nameInput");
-    roomInput = $("roomInput");
-    submitButton = $("submitButton");
+    desktop =
+        $("desktop");
 
-    world = $("world");
+    nameInput =
+        $("nameInput");
 
-    messageInput = $("messageInput");
-    startButton = $("startButton");
+    roomInput =
+        $("roomInput");
 
-    settingsButton = $("settingsButton");
-    settingsPanel = $("settingsPanel");
-    closeSettings = $("closeSettings");
+    submitButton =
+        $("submitButton");
 
-    addEvent(submitButton, "click", joinRoom);
+    world =
+        $("world");
 
-    addEvent(nameInput, "keydown", function (event) {
-        event = event || window.event;
+    messageInput =
+        $("messageInput");
 
-        if (event.keyCode === 13) {
-            joinRoom();
+    startButton =
+        $("startButton");
+
+    settingsButton =
+        $("settingsButton");
+
+    settingsPanel =
+        $("settingsPanel");
+
+    closeSettings =
+        $("closeSettings");
+
+
+    addEvent(
+        submitButton,
+        "click",
+        joinRoom
+    );
+
+
+    addEvent(
+        nameInput,
+        "keydown",
+        function (event) {
+            event =
+                event ||
+                window.event;
+
+            if (
+                event.keyCode ===
+                13
+            ) {
+                joinRoom();
+            }
         }
-    });
+    );
 
-    addEvent(roomInput, "keydown", function (event) {
-        event = event || window.event;
 
-        if (event.keyCode === 13) {
-            joinRoom();
+    addEvent(
+        roomInput,
+        "keydown",
+        function (event) {
+            event =
+                event ||
+                window.event;
+
+            if (
+                event.keyCode ===
+                13
+            ) {
+                joinRoom();
+            }
         }
-    });
+    );
 
-    addEvent(startButton, "click", sendMessage);
 
-    addEvent(messageInput, "keydown", function (event) {
-        event = event || window.event;
+    addEvent(
+        startButton,
+        "click",
+        sendMessage
+    );
 
-        if (event.keyCode === 13) {
-            sendMessage();
+
+    addEvent(
+        messageInput,
+        "keydown",
+        function (event) {
+            event =
+                event ||
+                window.event;
+
+            if (
+                event.keyCode ===
+                13
+            ) {
+                sendMessage();
+            }
         }
-    });
+    );
 
-    addEvent(settingsButton, "click", function (event) {
-        settingsPanel.style.display = "block";
 
-        preventDefault(event);
-        stopEvent(event);
-    });
+    addEvent(
+        settingsButton,
+        "click",
+        function (event) {
+            settingsPanel.style.display =
+                "block";
 
-    addEvent(closeSettings, "click", function () {
-        settingsPanel.style.display = "none";
-    });
+            preventDefault(event);
+            stopEvent(event);
+        }
+    );
 
-    /*
-     * Mouse dragging.
-     */
 
-    addEvent(document, "mousemove", dragMove);
-    addEvent(document, "mouseup", endDrag);
+    addEvent(
+        closeSettings,
+        "click",
+        function () {
+            settingsPanel.style.display =
+                "none";
+        }
+    );
 
-    /*
-     * Touch dragging for Windows Phone IE.
-     */
 
-    addEvent(document, "touchmove", dragMove);
-    addEvent(document, "touchend", endDrag);
-    addEvent(document, "touchcancel", endDrag);
+    addEvent(
+        document,
+        "mousemove",
+        dragMove
+    );
 
-    /*
-     * Pointer Events if available.
-     */
+    addEvent(
+        document,
+        "mouseup",
+        endDrag
+    );
 
-    addEvent(document, "pointermove", dragMove);
-    addEvent(document, "pointerup", endDrag);
-    addEvent(document, "pointercancel", endDrag);
+
+    addEvent(
+        document,
+        "touchmove",
+        dragMove
+    );
+
+    addEvent(
+        document,
+        "touchend",
+        endDrag
+    );
+
+    addEvent(
+        document,
+        "touchcancel",
+        endDrag
+    );
+
+
+    addEvent(
+        document,
+        "pointermove",
+        dragMove
+    );
+
+    addEvent(
+        document,
+        "pointerup",
+        endDrag
+    );
+
+    addEvent(
+        document,
+        "pointercancel",
+        endDrag
+    );
 }
 
-if (document.readyState === "complete") {
+
+/*
+============================================================
+START
+============================================================
+*/
+
+if (
+    document.readyState ===
+    "complete"
+) {
     initialize();
 } else {
-    addEvent(window, "load", initialize);
+    addEvent(
+        window,
+        "load",
+        initialize
+    );
 }
 
-addEvent(window, "beforeunload", function () {
-    if (myId) {
+
+/*
+============================================================
+LEAVE
+============================================================
+*/
+
+addEvent(
+    window,
+    "beforeunload",
+    function () {
+        if (!myId) {
+            return;
+        }
+
         ajax(
             "POST",
             "/api/leave",
@@ -937,4 +1761,4 @@ addEvent(window, "beforeunload", function () {
             null
         );
     }
-});
+);
