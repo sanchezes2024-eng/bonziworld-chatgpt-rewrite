@@ -10,22 +10,22 @@ var dragging = false;
 var pollTimer = null;
 var pollInProgress = false;
 
-var loginScreen = null;
-var desktop = null;
-var nameInput = null;
-var roomInput = null;
-var submitButton = null;
-var world = null;
-var messageInput = null;
-var startButton = null;
-var settingsButton = null;
-var settingsPanel = null;
-var closeSettings = null;
+var loginScreen;
+var desktop;
+var nameInput;
+var roomInput;
+var submitButton;
+var world;
+var messageInput;
+var startButton;
+var settingsButton;
+var settingsPanel;
+var closeSettings;
 
 
 /*
 ============================================================
-DOM
+DOM HELPERS
 ============================================================
 */
 
@@ -39,16 +39,9 @@ function addEvent(element, name, handler) {
     }
 
     if (element.attachEvent) {
-        element.attachEvent(
-            "on" + name,
-            handler
-        );
+        element.attachEvent("on" + name, handler);
     } else if (element.addEventListener) {
-        element.addEventListener(
-            name,
-            handler,
-            false
-        );
+        element.addEventListener(name, handler, false);
     }
 }
 
@@ -75,15 +68,14 @@ function stopEvent(event) {
 
 /*
 ============================================================
-JSON COMPATIBILITY
+JSON
+
+IE7 does not have native JSON.parse().
 ============================================================
 */
 
 function parseJSON(text) {
-    if (
-        window.JSON &&
-        JSON.parse
-    ) {
+    if (window.JSON && typeof JSON.parse === "function") {
         try {
             return JSON.parse(text);
         } catch (e) {
@@ -91,17 +83,8 @@ function parseJSON(text) {
         }
     }
 
-    /*
-     * IE7 fallback.
-     *
-     * The server only sends JSON that it
-     * generated itself.
-     */
-
     try {
-        return eval(
-            "(" + text + ")"
-        );
+        return eval("(" + text + ")");
     } catch (e2) {
         return null;
     }
@@ -110,60 +93,74 @@ function parseJSON(text) {
 
 /*
 ============================================================
-AJAX
+AJAX / HTTP POLLING
 ============================================================
 */
 
-function ajax(
-    method,
-    address,
-    data,
-    callback
-) {
-    var xhr;
-    var body;
-    var key;
-    var completed = false;
+function createXHR() {
+    var xhr = null;
 
-    xhr =
-        new XMLHttpRequest();
-
-    body = "";
-
-    if (data) {
-        for (key in data) {
-            if (
-                !data.hasOwnProperty(
-                    key
-                )
-            ) {
-                continue;
+    try {
+        xhr = new XMLHttpRequest();
+    } catch (e) {
+        try {
+            xhr = new ActiveXObject("Microsoft.XMLHTTP");
+        } catch (e2) {
+            try {
+                xhr = new ActiveXObject("Msxml2.XMLHTTP");
+            } catch (e3) {
+                xhr = null;
             }
-
-            if (body !== "") {
-                body += "&";
-            }
-
-            body +=
-                encodeURIComponent(
-                    key
-                );
-
-            body += "=";
-
-            body +=
-                encodeURIComponent(
-                    data[key]
-                );
         }
     }
 
+    return xhr;
+}
+
+function encodeForm(data) {
+    var result = "";
+    var key;
+
+    if (!data) {
+        return result;
+    }
+
+    for (key in data) {
+        if (!data.hasOwnProperty(key)) {
+            continue;
+        }
+
+        if (result !== "") {
+            result += "&";
+        }
+
+        result += encodeURIComponent(key);
+        result += "=";
+        result += encodeURIComponent(data[key]);
+    }
+
+    return result;
+}
+
+function ajax(method, url, data, callback) {
+    var xhr;
+    var body;
+    var finished = false;
+
+    xhr = createXHR();
+
+    if (!xhr) {
+        if (callback) {
+            callback(null);
+        }
+
+        return;
+    }
+
+    body = encodeForm(data);
+
     try {
-        xhr.open(
-            method,
-            address,
-            true
-        );
+        xhr.open(method, url, true);
     } catch (e) {
         if (callback) {
             callback(null);
@@ -181,40 +178,34 @@ function ajax(
         } catch (e2) {}
     }
 
-    xhr.onreadystatechange =
-        function () {
-            var result;
+    xhr.onreadystatechange = function () {
+        var result;
 
-            if (
-                xhr.readyState !== 4
-            ) {
-                return;
+        if (xhr.readyState !== 4) {
+            return;
+        }
+
+        if (finished) {
+            return;
+        }
+
+        finished = true;
+
+        if (
+            xhr.status >= 200 &&
+            xhr.status < 300
+        ) {
+            result = parseJSON(xhr.responseText);
+
+            if (callback) {
+                callback(result);
             }
-
-            if (completed) {
-                return;
+        } else {
+            if (callback) {
+                callback(null);
             }
-
-            completed = true;
-
-            if (
-                xhr.status >= 200 &&
-                xhr.status < 300
-            ) {
-                result =
-                    parseJSON(
-                        xhr.responseText
-                    );
-
-                if (callback) {
-                    callback(result);
-                }
-            } else {
-                if (callback) {
-                    callback(null);
-                }
-            }
-        };
+        }
+    };
 
     try {
         xhr.send(
@@ -223,8 +214,8 @@ function ajax(
                 : null
         );
     } catch (e3) {
-        if (!completed) {
-            completed = true;
+        if (!finished) {
+            finished = true;
 
             if (callback) {
                 callback(null);
@@ -244,11 +235,11 @@ function joinRoom() {
     var name;
     var room;
 
-    name =
-        nameInput.value;
+    name = nameInput.value;
+    room = roomInput.value;
 
-    room =
-        roomInput.value;
+    name = trim(name);
+    room = trim(room);
 
     if (!name) {
         name = "Anonymous";
@@ -261,8 +252,7 @@ function joinRoom() {
     myName = name;
     currentRoom = room;
 
-    submitButton.disabled =
-        true;
+    submitButton.disabled = true;
 
     ajax(
         "POST",
@@ -274,8 +264,7 @@ function joinRoom() {
         function (result) {
             var i;
 
-            submitButton.disabled =
-                false;
+            submitButton.disabled = false;
 
             if (
                 !result ||
@@ -289,10 +278,7 @@ function joinRoom() {
                 return;
             }
 
-            myId =
-                String(
-                    result.id
-                );
+            myId = String(result.id);
 
             currentRoom =
                 result.player.room;
@@ -313,8 +299,7 @@ function joinRoom() {
             ) {
                 for (
                     i = 0;
-                    i <
-                    result.events.length;
+                    i < result.events.length;
                     i++
                 ) {
                     handleEvent(
@@ -337,39 +322,40 @@ POLLING
 
 function startPolling() {
     if (pollTimer) {
-        window.clearTimeout(
-            pollTimer
-        );
+        window.clearTimeout(pollTimer);
+        pollTimer = null;
     }
 
     poll();
 }
 
 function poll() {
-    if (
-        !myId ||
-        pollInProgress
-    ) {
+    var requestUrl;
+
+    if (!myId) {
         return;
     }
 
-    pollInProgress =
-        true;
+    if (pollInProgress) {
+        return;
+    }
+
+    pollInProgress = true;
+
+    requestUrl =
+        "/api/poll?id=" +
+        encodeURIComponent(myId) +
+        "&t=" +
+        new Date().getTime();
 
     ajax(
         "GET",
-        "/api/poll?id=" +
-        encodeURIComponent(
-            myId
-        ) +
-        "&t=" +
-        new Date().getTime(),
+        requestUrl,
         null,
         function (result) {
             var i;
 
-            pollInProgress =
-                false;
+            pollInProgress = false;
 
             if (
                 result &&
@@ -377,8 +363,7 @@ function poll() {
             ) {
                 for (
                     i = 0;
-                    i <
-                    result.events.length;
+                    i < result.events.length;
                     i++
                 ) {
                     handleEvent(
@@ -390,7 +375,7 @@ function poll() {
             pollTimer =
                 window.setTimeout(
                     poll,
-                    20
+                    10
                 );
         }
     );
@@ -399,7 +384,7 @@ function poll() {
 
 /*
 ============================================================
-EVENTS
+EVENT HANDLER
 ============================================================
 */
 
@@ -412,10 +397,7 @@ function handleEvent(event) {
         event.event ===
         "playerJoined"
     ) {
-        createPlayer(
-            event.data
-        );
-
+        createPlayer(event.data);
         return;
     }
 
@@ -492,34 +474,29 @@ function handleEvent(event) {
 
 /*
 ============================================================
-PLAYERS
+PLAYER CREATION
 ============================================================
 */
 
 function createPlayer(data) {
+    var id;
     var player;
     var element;
-    var name;
-    var character;
+    var nameElement;
+    var characterElement;
 
-    if (
-        !data ||
-        !data.id
-    ) {
+    if (!data || !data.id) {
         return;
     }
 
-    if (
-        players[
-            String(data.id)
-        ]
-    ) {
+    id = String(data.id);
+
+    if (players[id]) {
         return;
     }
 
     player = {
-        id:
-            String(data.id),
+        id: id,
 
         name:
             data.name ||
@@ -530,14 +507,10 @@ function createPlayer(data) {
             currentRoom,
 
         x:
-            parseFloat(
-                data.x
-            ),
+            parseFloat(data.x),
 
         y:
-            parseFloat(
-                data.y
-            ),
+            parseFloat(data.y),
 
         color:
             data.color ||
@@ -548,7 +521,10 @@ function createPlayer(data) {
             "bonzi",
 
         element: null,
-        bubble: null
+
+        bubble: null,
+
+        bubbleTimer: null
     };
 
     if (isNaN(player.x)) {
@@ -560,99 +536,76 @@ function createPlayer(data) {
     }
 
     element =
-        document.createElement(
-            "div"
-        );
-
-    element.className =
-        "player";
+        document.createElement("div");
 
     if (
         player.character ===
         "bonzi"
     ) {
-        element.className +=
-            " bonziPlayer";
+        element.className =
+            "player bonziPlayer";
+    } else {
+        element.className =
+            "player squareCharacter";
     }
 
-    name =
-        document.createElement(
-            "div"
-        );
+    nameElement =
+        document.createElement("div");
 
-    name.className =
+    nameElement.className =
         "playerName";
 
-    name.appendChild(
+    nameElement.appendChild(
         document.createTextNode(
             player.name
         )
     );
 
     element.appendChild(
-        name
+        nameElement
     );
 
     if (
         player.character ===
         "bonzi"
     ) {
-        character =
-            document.createElement(
-                "img"
-            );
+        characterElement =
+            document.createElement("img");
 
-        character.className =
+        characterElement.className =
             "bonziCharacter";
 
-        character.src =
+        characterElement.src =
             "/bonzi.png";
 
-        character.alt = "";
+        characterElement.alt = "";
 
         element.appendChild(
-            character
-        );
-    } else {
-        character =
-            document.createElement(
-                "div"
-            );
-
-        character.className =
-            "squareCharacter";
-
-        element.appendChild(
-            character
+            characterElement
         );
     }
 
-    player.element =
-        element;
+    player.element = element;
 
-    world.appendChild(
-        element
-    );
+    players[id] = player;
 
-    players[player.id] =
-        player;
+    world.appendChild(element);
 
-    updatePlayerPosition(
-        player
-    );
+    updatePlayerPosition(player);
 
-    updatePlayerColor(
-        player
-    );
+    updatePlayerColor(player);
 
-    setupDragging(
-        player
-    );
+    setupDragging(player);
 }
 
-function updatePlayerPosition(
-    player
-) {
+
+/*
+============================================================
+PLAYER POSITION
+============================================================
+*/
+
+function updatePlayerPosition(player) {
     if (
         !player ||
         !player.element
@@ -667,47 +620,49 @@ function updatePlayerPosition(
         player.y + "%";
 }
 
-function movePlayer(
-    id,
-    x,
-    y
-) {
+function movePlayer(id, x, y) {
     var player;
 
     player =
-        players[
-            String(id)
-        ];
+        players[String(id)];
 
     if (!player) {
         return;
     }
 
-    player.x =
-        parseFloat(x);
+    player.x = parseFloat(x);
+    player.y = parseFloat(y);
 
-    player.y =
-        parseFloat(y);
+    if (isNaN(player.x)) {
+        player.x = 50;
+    }
 
-    updatePlayerPosition(
-        player
-    );
+    if (isNaN(player.y)) {
+        player.y = 50;
+    }
+
+    updatePlayerPosition(player);
 }
 
 
 /*
 ============================================================
 DRAGGING
+
+Everyone can drag everyone.
+
+The server receives both:
+
+senderId = the person doing the dragging
+
+playerId = the character being dragged
 ============================================================
 */
 
-function setupDragging(
-    player
-) {
+function setupDragging(player) {
     var element;
 
-    element =
-        player.element;
+    element = player.element;
 
     addEvent(
         element,
@@ -743,9 +698,7 @@ function setupDragging(
     );
 }
 
-function getPointerPosition(
-    event
-) {
+function getPointerPosition(event) {
     var touch;
 
     event =
@@ -784,19 +737,13 @@ function getPointerPosition(
     };
 }
 
-function beginDrag(
-    player,
-    event
-) {
+function beginDrag(player, event) {
     if (!player) {
         return;
     }
 
-    draggingPlayer =
-        player;
-
-    dragging =
-        true;
+    draggingPlayer = player;
+    dragging = true;
 
     preventDefault(event);
     stopEvent(event);
@@ -816,12 +763,18 @@ function dragMove(event) {
     }
 
     pointer =
-        getPointerPosition(
-            event
-        );
+        getPointerPosition(event);
 
     rect =
         world.getBoundingClientRect();
+
+    if (
+        !rect ||
+        !rect.width ||
+        !rect.height
+    ) {
+        return;
+    }
 
     x =
         (
@@ -855,32 +808,35 @@ function dragMove(event) {
         )
     );
 
-    draggingPlayer.x =
-        x;
-
-    draggingPlayer.y =
-        y;
+    draggingPlayer.x = x;
+    draggingPlayer.y = y;
 
     updatePlayerPosition(
         draggingPlayer
     );
 
-    ajax(
-        "POST",
-        "/api/move",
-        {
-            senderId: myId,
-            playerId:
-                draggingPlayer.id,
-            x: x,
-            y: y
-        },
-        null
-    );
+    if (myId) {
+        ajax(
+            "POST",
+            "/api/move",
+            {
+                senderId:
+                    myId,
 
-    preventDefault(
-        event
-    );
+                playerId:
+                    draggingPlayer.id,
+
+                x:
+                    x,
+
+                y:
+                    y
+            },
+            null
+        );
+    }
+
+    preventDefault(event);
 }
 
 function endDrag(event) {
@@ -888,21 +844,16 @@ function endDrag(event) {
         return;
     }
 
-    dragging =
-        false;
+    dragging = false;
+    draggingPlayer = null;
 
-    draggingPlayer =
-        null;
-
-    preventDefault(
-        event
-    );
+    preventDefault(event);
 }
 
 
 /*
 ============================================================
-COLORS
+COLOR HANDLING
 ============================================================
 */
 
@@ -913,25 +864,18 @@ function changePlayerColor(
     var player;
 
     player =
-        players[
-            String(id)
-        ];
+        players[String(id)];
 
     if (!player) {
         return;
     }
 
-    player.color =
-        color;
+    player.color = color;
 
-    updatePlayerColor(
-        player
-    );
+    updatePlayerColor(player);
 }
 
-function colorToHue(
-    color
-) {
+function colorToHue(color) {
     var r;
     var g;
     var b;
@@ -943,57 +887,39 @@ function colorToHue(
         String(color)
             .toLowerCase();
 
-    if (
-        color === "red"
-    ) {
+    if (color === "red") {
         return 0;
     }
 
-    if (
-        color === "orange"
-    ) {
+    if (color === "orange") {
         return 30;
     }
 
-    if (
-        color === "yellow"
-    ) {
+    if (color === "yellow") {
         return 60;
     }
 
-    if (
-        color === "green"
-    ) {
+    if (color === "green") {
         return 120;
     }
 
-    if (
-        color === "cyan"
-    ) {
+    if (color === "cyan") {
         return 180;
     }
 
-    if (
-        color === "blue"
-    ) {
+    if (color === "blue") {
         return 240;
     }
 
-    if (
-        color === "purple"
-    ) {
+    if (color === "purple") {
         return 270;
     }
 
-    if (
-        color === "magenta"
-    ) {
+    if (color === "magenta") {
         return 300;
     }
 
-    if (
-        color === "pink"
-    ) {
+    if (color === "pink") {
         return 330;
     }
 
@@ -1069,12 +995,7 @@ function colorToHue(
     return h;
 }
 
-function updatePlayerColor(
-    player
-) {
-    var elements;
-    var images;
-    var i;
+function updatePlayerColor(player) {
     var hue;
     var shift;
 
@@ -1085,32 +1006,15 @@ function updatePlayerColor(
         return;
     }
 
-    elements =
-        player.element
-            .getElementsByTagName(
-                "div"
-            );
-
-    for (
-        i = 0;
-        i < elements.length;
-        i++
+    if (
+        player.character ===
+        "square"
     ) {
-        if (
-            elements[i].className ===
-            "squareCharacter"
-        ) {
-            elements[i].style
-                .backgroundColor =
-                player.color;
-        }
-    }
+        player.element.style.backgroundColor =
+            player.color;
 
-    images =
-        player.element
-            .getElementsByTagName(
-                "img"
-            );
+        return;
+    }
 
     hue =
         colorToHue(
@@ -1120,25 +1024,41 @@ function updatePlayerColor(
     shift =
         hue - 270;
 
-    for (
-        i = 0;
-        i < images.length;
-        i++
-    ) {
-        if (
-            images[i].className ===
-            "bonziCharacter"
-        ) {
-            images[i].style.filter =
+    /*
+     * CSS variable is used by the
+     * stylesheet:
+     *
+     * filter:
+     *     hue-rotate(
+     *         var(--bonzi-hue, 0deg)
+     *     );
+     */
+
+    try {
+        player.element.style.setProperty(
+            "--bonzi-hue",
+            shift + "deg"
+        );
+    } catch (e) {
+        /*
+         * Older IE does not support
+         * CSS custom properties.
+         *
+         * Fall back to directly
+         * applying the filter.
+         */
+
+        try {
+            player.element.style.filter =
                 "hue-rotate(" +
                 shift +
                 "deg)";
 
-            images[i].style.msFilter =
+            player.element.style.msFilter =
                 "hue-rotate(" +
                 shift +
                 "deg)";
-        }
+        } catch (e2) {}
     }
 }
 
@@ -1154,48 +1074,31 @@ function changePlayerCharacter(
     character
 ) {
     var player;
-    var name;
+    var nameElement;
     var image;
-    var square;
 
     player =
-        players[
-            String(id)
-        ];
+        players[String(id)];
 
     if (!player) {
         return;
     }
 
+    character =
+        character === "square"
+            ? "square"
+            : "bonzi";
+
     player.character =
         character;
 
     while (
-        player.element.childNodes.length
+        player.element.firstChild
     ) {
         player.element.removeChild(
-            player.element
-                .childNodes[0]
+            player.element.firstChild
         );
     }
-
-    name =
-        document.createElement(
-            "div"
-        );
-
-    name.className =
-        "playerName";
-
-    name.appendChild(
-        document.createTextNode(
-            player.name
-        )
-    );
-
-    player.element.appendChild(
-        name
-    );
 
     if (
         character ===
@@ -1203,6 +1106,24 @@ function changePlayerCharacter(
     ) {
         player.element.className =
             "player bonziPlayer";
+
+        nameElement =
+            document.createElement(
+                "div"
+            );
+
+        nameElement.className =
+            "playerName";
+
+        nameElement.appendChild(
+            document.createTextNode(
+                player.name
+            )
+        );
+
+        player.element.appendChild(
+            nameElement
+        );
 
         image =
             document.createElement(
@@ -1222,32 +1143,31 @@ function changePlayerCharacter(
         );
     } else {
         player.element.className =
-            "player";
+            "player squareCharacter";
 
-        square =
+        nameElement =
             document.createElement(
                 "div"
             );
 
-        square.className =
-            "squareCharacter";
+        nameElement.className =
+            "playerName";
+
+        nameElement.appendChild(
+            document.createTextNode(
+                player.name
+            )
+        );
 
         player.element.appendChild(
-            square
+            nameElement
         );
     }
 
-    updatePlayerPosition(
-        player
-    );
+    updatePlayerPosition(player);
+    updatePlayerColor(player);
 
-    updatePlayerColor(
-        player
-    );
-
-    setupDragging(
-        player
-    );
+    setupDragging(player);
 }
 
 
@@ -1257,38 +1177,40 @@ REMOVE PLAYER
 ============================================================
 */
 
-function removePlayer(
-    id
-) {
+function removePlayer(id) {
     var player;
 
     player =
-        players[
-            String(id)
-        ];
+        players[String(id)];
 
     if (!player) {
         return;
+    }
+
+    if (player.bubbleTimer) {
+        window.clearTimeout(
+            player.bubbleTimer
+        );
+
+        player.bubbleTimer = null;
     }
 
     if (
         player.bubble &&
         player.bubble.parentNode
     ) {
-        player.bubble.parentNode
-            .removeChild(
-                player.bubble
-            );
+        player.bubble.parentNode.removeChild(
+            player.bubble
+        );
     }
 
     if (
         player.element &&
         player.element.parentNode
     ) {
-        player.element.parentNode
-            .removeChild(
-                player.element
-            );
+        player.element.parentNode.removeChild(
+            player.element
+        );
     }
 
     delete players[
@@ -1299,20 +1221,15 @@ function removePlayer(
 
 /*
 ============================================================
-MESSAGE
+MESSAGES
 ============================================================
 */
 
-function showMessage(
-    id,
-    text
-) {
+function showMessage(id, text) {
     var player;
 
     player =
-        players[
-            String(id)
-        ];
+        players[String(id)];
 
     if (!player) {
         return;
@@ -1323,9 +1240,18 @@ function showMessage(
         text
     );
 
-    speakText(
-        text
-    );
+    /*
+     * Don't speak commands.
+     */
+
+    if (
+        String(text).charAt(0) ===
+        "/"
+    ) {
+        return;
+    }
+
+    speakText(text);
 }
 
 
@@ -1340,17 +1266,29 @@ function showSpeechBubble(
     text
 ) {
     var bubble;
-    var arrow;
-    var inner;
+
+    if (
+        !player ||
+        !player.element
+    ) {
+        return;
+    }
+
+    if (player.bubbleTimer) {
+        window.clearTimeout(
+            player.bubbleTimer
+        );
+
+        player.bubbleTimer = null;
+    }
 
     if (
         player.bubble &&
         player.bubble.parentNode
     ) {
-        player.bubble.parentNode
-            .removeChild(
-                player.bubble
-            );
+        player.bubble.parentNode.removeChild(
+            player.bubble
+        );
     }
 
     bubble =
@@ -1367,30 +1305,6 @@ function showSpeechBubble(
         )
     );
 
-    arrow =
-        document.createElement(
-            "div"
-        );
-
-    arrow.className =
-        "speechBubbleArrow";
-
-    inner =
-        document.createElement(
-            "div"
-        );
-
-    inner.className =
-        "speechBubbleArrowInner";
-
-    arrow.appendChild(
-        inner
-    );
-
-    bubble.appendChild(
-        arrow
-    );
-
     player.element.appendChild(
         bubble
     );
@@ -1398,30 +1312,42 @@ function showSpeechBubble(
     player.bubble =
         bubble;
 
-    window.setTimeout(
-        function () {
-            if (
-                player.bubble ===
-                bubble &&
-                bubble.parentNode
-            ) {
-                bubble.parentNode
-                    .removeChild(
-                        bubble
-                    );
+    player.bubbleTimer =
+        window.setTimeout(
+            function () {
+                if (
+                    player.bubble ===
+                    bubble
+                ) {
+                    if (
+                        bubble.parentNode
+                    ) {
+                        bubble.parentNode.removeChild(
+                            bubble
+                        );
+                    }
 
-                player.bubble =
+                    player.bubble =
+                        null;
+                }
+
+                player.bubbleTimer =
                     null;
-            }
-        },
-        5000
-    );
+            },
+            5000
+        );
 }
 
 
 /*
 ============================================================
-eSPEAK JAVASCRIPT
+eSPEAK
+
+Uses speakClient.js /
+speakGenerator.js /
+speakWorker.js.
+
+No server-side TTS.
 ============================================================
 */
 
@@ -1436,8 +1362,7 @@ function speakText(text) {
     }
 
     /*
-     * speakClient.js normally exposes
-     * the global speak() function.
+     * Standard speakClient.js API.
      */
 
     if (
@@ -1463,8 +1388,7 @@ function speakText(text) {
     }
 
     /*
-     * Some versions expose the
-     * generator differently.
+     * Alternate generator API.
      */
 
     if (
@@ -1482,7 +1406,7 @@ function speakText(text) {
 
 /*
 ============================================================
-SEND
+SEND MESSAGE
 ============================================================
 */
 
@@ -1494,7 +1418,9 @@ function sendMessage() {
     }
 
     text =
-        messageInput.value;
+        trim(
+            messageInput.value
+        );
 
     if (!text) {
         return;
@@ -1507,8 +1433,11 @@ function sendMessage() {
         "POST",
         "/api/send",
         {
-            id: myId,
-            message: text
+            id:
+                myId,
+
+            message:
+                text
         },
         null
     );
@@ -1521,9 +1450,7 @@ SYSTEM MESSAGE
 ============================================================
 */
 
-function showSystemMessage(
-    text
-) {
+function showSystemMessage(text) {
     if (window.console) {
         try {
             window.console.log(
@@ -1531,6 +1458,21 @@ function showSystemMessage(
             );
         } catch (e) {}
     }
+}
+
+
+/*
+============================================================
+TRIM
+============================================================
+*/
+
+function trim(text) {
+    return String(text)
+        .replace(
+            /^\s+|\s+$/g,
+            ""
+        );
 }
 
 
@@ -1575,6 +1517,10 @@ function initialize() {
         $("closeSettings");
 
 
+    /*
+     * Login
+     */
+
     addEvent(
         submitButton,
         "click",
@@ -1618,6 +1564,10 @@ function initialize() {
     );
 
 
+    /*
+     * Chat
+     */
+
     addEvent(
         startButton,
         "click",
@@ -1643,6 +1593,10 @@ function initialize() {
     );
 
 
+    /*
+     * Settings
+     */
+
     addEvent(
         settingsButton,
         "click",
@@ -1659,12 +1613,19 @@ function initialize() {
     addEvent(
         closeSettings,
         "click",
-        function () {
+        function (event) {
             settingsPanel.style.display =
                 "none";
+
+            preventDefault(event);
+            stopEvent(event);
         }
     );
 
+
+    /*
+     * Mouse dragging
+     */
 
     addEvent(
         document,
@@ -1678,6 +1639,10 @@ function initialize() {
         endDrag
     );
 
+
+    /*
+     * Touch dragging
+     */
 
     addEvent(
         document,
@@ -1697,6 +1662,10 @@ function initialize() {
         endDrag
     );
 
+
+    /*
+     * Pointer events
+     */
 
     addEvent(
         document,
@@ -1720,7 +1689,7 @@ function initialize() {
 
 /*
 ============================================================
-START
+INITIALIZE
 ============================================================
 */
 
@@ -1740,7 +1709,7 @@ if (
 
 /*
 ============================================================
-LEAVE
+LEAVE CHAT
 ============================================================
 */
 
@@ -1756,7 +1725,8 @@ addEvent(
             "POST",
             "/api/leave",
             {
-                id: myId
+                id:
+                    myId
             },
             null
         );
