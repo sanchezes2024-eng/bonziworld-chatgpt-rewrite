@@ -1,13 +1,9 @@
-/* ============================================================
-   CHAT CLIENT
-   IE7+ compatible JavaScript
-   ============================================================ */
-
 var myId = null;
 var myName = "";
 var currentRoom = "default";
 
 var players = {};
+
 var draggingPlayer = null;
 var dragging = false;
 
@@ -27,9 +23,11 @@ var settingsPanel;
 var settingsClose;
 
 
-/* ============================================================
-   DOM HELPERS
-   ============================================================ */
+/*
+============================================================
+DOM
+============================================================
+*/
 
 function $(id) {
     return document.getElementById(id);
@@ -41,9 +39,16 @@ function addEvent(element, eventName, handler) {
     }
 
     if (element.addEventListener) {
-        element.addEventListener(eventName, handler, false);
+        element.addEventListener(
+            eventName,
+            handler,
+            false
+        );
     } else if (element.attachEvent) {
-        element.attachEvent("on" + eventName, handler);
+        element.attachEvent(
+            "on" + eventName,
+            handler
+        );
     } else {
         element["on" + eventName] = handler;
     }
@@ -70,12 +75,17 @@ function stopEvent(event) {
 }
 
 
-/* ============================================================
-   JSON
-   ============================================================ */
+/*
+============================================================
+JSON
+============================================================
+*/
 
 function parseJSON(text) {
-    if (window.JSON && JSON.parse) {
+    if (
+        window.JSON &&
+        typeof JSON.parse === "function"
+    ) {
         return JSON.parse(text);
     }
 
@@ -83,9 +93,11 @@ function parseJSON(text) {
 }
 
 
-/* ============================================================
-   XHR
-   ============================================================ */
+/*
+============================================================
+XHR
+============================================================
+*/
 
 function createXHR() {
     if (window.XMLHttpRequest) {
@@ -93,10 +105,14 @@ function createXHR() {
     }
 
     try {
-        return new ActiveXObject("Microsoft.XMLHTTP");
+        return new ActiveXObject(
+            "Microsoft.XMLHTTP"
+        );
     } catch (e1) {
         try {
-            return new ActiveXObject("Msxml2.XMLHTTP");
+            return new ActiveXObject(
+                "Msxml2.XMLHTTP"
+            );
         } catch (e2) {
             return null;
         }
@@ -104,50 +120,62 @@ function createXHR() {
 }
 
 
-/* ============================================================
-   FORM ENCODING
-   ============================================================ */
-
-function encodeValue(value) {
-    value = String(value);
-
-    return encodeURIComponent(value);
-}
+/*
+============================================================
+FORM ENCODING
+============================================================
+*/
 
 function encodeForm(data) {
     var parts = [];
     var key;
 
     for (key in data) {
-        if (data.hasOwnProperty) {
-            if (!data.hasOwnProperty(key)) {
-                continue;
-            }
+        if (
+            Object.prototype.hasOwnProperty.call(
+                data,
+                key
+            )
+        ) {
+            parts.push(
+                encodeURIComponent(key) +
+                "=" +
+                encodeURIComponent(
+                    String(data[key])
+                )
+            );
         }
-
-        parts.push(
-            encodeURIComponent(key) +
-            "=" +
-            encodeValue(data[key])
-        );
     }
 
     return parts.join("&");
 }
 
 
-/* ============================================================
-   AJAX
-   ============================================================ */
+/*
+============================================================
+AJAX
+============================================================
+*/
 
 function ajax(method, url, data, callback) {
     var xhr = createXHR();
 
     if (!xhr) {
+        if (callback) {
+            callback(
+                0,
+                ""
+            );
+        }
+
         return;
     }
 
-    xhr.open(method, url, true);
+    xhr.open(
+        method,
+        url,
+        true
+    );
 
     if (method === "POST") {
         xhr.setRequestHeader(
@@ -161,25 +189,40 @@ function ajax(method, url, data, callback) {
             return;
         }
 
-        callback(
-            xhr.status,
-            xhr.responseText
-        );
+        if (callback) {
+            callback(
+                xhr.status,
+                xhr.responseText
+            );
+        }
     };
 
-    if (method === "POST") {
-        xhr.send(
-            data ? encodeForm(data) : ""
-        );
-    } else {
-        xhr.send(null);
+    try {
+        if (method === "POST") {
+            xhr.send(
+                data ?
+                    encodeForm(data) :
+                    ""
+            );
+        } else {
+            xhr.send(null);
+        }
+    } catch (e) {
+        if (callback) {
+            callback(
+                0,
+                ""
+            );
+        }
     }
 }
 
 
-/* ============================================================
-   JOIN
-   ============================================================ */
+/*
+============================================================
+JOIN
+============================================================
+*/
 
 function joinRoom() {
     var name = nameInput.value;
@@ -209,7 +252,10 @@ function joinRoom() {
             submitButton.disabled = false;
 
             if (status !== 200) {
-                alert("Could not connect to the server.");
+                alert(
+                    "Could not connect to the server."
+                );
+
                 return;
             }
 
@@ -218,21 +264,39 @@ function joinRoom() {
             try {
                 data = parseJSON(response);
             } catch (e) {
-                alert("The server returned invalid data.");
+                alert(
+                    "The server returned invalid data."
+                );
+
+                return;
+            }
+
+            if (!data.id) {
+                alert(
+                    "The server did not give us a player ID."
+                );
+
                 return;
             }
 
             myId = data.id;
 
-            loginScreen.style.display = "none";
-            desktop.style.display = "block";
+            loginScreen.style.display =
+                "none";
+
+            desktop.style.display =
+                "block";
 
             if (data.player) {
-                createPlayer(data.player);
+                createPlayer(
+                    data.player
+                );
             }
 
             if (data.events) {
-                handleEvents(data.events);
+                handleEvents(
+                    data.events
+                );
             }
 
             startPolling();
@@ -241,13 +305,15 @@ function joinRoom() {
 }
 
 
-/* ============================================================
-   POLLING
-   ============================================================ */
+/*
+============================================================
+POLLING
+============================================================
+*/
 
 function startPolling() {
     if (pollTimer) {
-        window.clearTimeout(pollTimer);
+        clearTimeout(pollTimer);
         pollTimer = null;
     }
 
@@ -257,7 +323,10 @@ function startPolling() {
 function poll() {
     var xhr;
 
-    if (!myId || pollInProgress) {
+    if (
+        !myId ||
+        pollInProgress
+    ) {
         return;
     }
 
@@ -267,6 +336,12 @@ function poll() {
 
     if (!xhr) {
         pollInProgress = false;
+
+        pollTimer = setTimeout(
+            poll,
+            1000
+        );
+
         return;
     }
 
@@ -288,54 +363,87 @@ function poll() {
 
         if (xhr.status === 200) {
             try {
-                var data = parseJSON(xhr.responseText);
+                var data =
+                    parseJSON(
+                        xhr.responseText
+                    );
 
                 if (data.events) {
-                    handleEvents(data.events);
+                    handleEvents(
+                        data.events
+                    );
                 }
             } catch (e) {
             }
         }
 
-        pollTimer = window.setTimeout(
+        pollTimer = setTimeout(
             poll,
             10
         );
     };
 
-    xhr.send(null);
+    try {
+        xhr.send(null);
+    } catch (e) {
+        pollInProgress = false;
+
+        pollTimer = setTimeout(
+            poll,
+            1000
+        );
+    }
 }
 
 
-/* ============================================================
-   EVENTS
-   ============================================================ */
+/*
+============================================================
+EVENTS
+============================================================
+*/
 
 function handleEvents(events) {
     var i;
 
-    for (i = 0; i < events.length; i++) {
-        handleEvent(events[i]);
+    for (
+        i = 0;
+        i < events.length;
+        i++
+    ) {
+        handleEvent(
+            events[i]
+        );
     }
 }
 
 function handleEvent(event) {
-    if (!event || !event.type) {
+    if (
+        !event ||
+        !event.type
+    ) {
         return;
     }
 
     switch (event.type) {
 
         case "playerJoined":
-            createPlayer(event.player);
+            if (event.player) {
+                createPlayer(
+                    event.player
+                );
+            }
             break;
 
         case "playerMoved":
-            movePlayerFromServer(event);
+            movePlayerFromServer(
+                event
+            );
             break;
 
         case "playerColorChanged":
-            if (players[event.playerId]) {
+            if (
+                players[event.playerId]
+            ) {
                 players[event.playerId].color =
                     event.color;
 
@@ -346,7 +454,9 @@ function handleEvent(event) {
             break;
 
         case "playerCharacterChanged":
-            if (players[event.playerId]) {
+            if (
+                players[event.playerId]
+            ) {
                 changePlayerCharacter(
                     players[event.playerId],
                     event.character
@@ -355,7 +465,9 @@ function handleEvent(event) {
             break;
 
         case "playerLeft":
-            removePlayer(event.playerId);
+            removePlayer(
+                event.playerId
+            );
             break;
 
         case "message":
@@ -367,54 +479,69 @@ function handleEvent(event) {
             break;
 
         case "systemMessage":
-            showSystemMessage(event.text);
+            showSystemMessage(
+                event.text
+            );
             break;
     }
 }
 
 
-/* ============================================================
-   PLAYER CREATION
-   ============================================================ */
+/*
+============================================================
+PLAYER CREATION
+============================================================
+*/
 
 function createPlayer(data) {
-    var existing;
     var player;
-    var name;
+    var nameElement;
+    var image;
 
-    if (!data || !data.id) {
-        return;
+    if (
+        !data ||
+        !data.id
+    ) {
+        return null;
     }
 
-    existing = players[data.id];
-
-    if (existing) {
-        return existing;
+    if (
+        players[data.id]
+    ) {
+        return players[data.id];
     }
 
     player = {
         id: data.id,
         name: data.name || "Anonymous",
         room: data.room || currentRoom,
-        x: data.x || 50,
-        y: data.y || 50,
-        color: data.color || "#800080",
-        character: data.character || "bonzi",
+        x: Number(data.x) || 50,
+        y: Number(data.y) || 50,
+        color: data.color || "#8800ff",
+        character:
+            data.character === "square"
+                ? "square"
+                : "bonzi",
         element: null,
         nameElement: null,
         imageElement: null,
         bubbleElement: null
     };
 
-    players[player.id] = player;
+    players[player.id] =
+        player;
 
     player.element =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     player.element.className =
         "player";
 
-    if (player.character === "bonzi") {
+    if (
+        player.character === "bonzi"
+    ) {
         player.element.className +=
             " bonziPlayer";
     } else {
@@ -422,34 +549,48 @@ function createPlayer(data) {
             " squareCharacter";
     }
 
-    name =
-        document.createElement("div");
+    nameElement =
+        document.createElement(
+            "div"
+        );
 
-    name.className =
+    nameElement.className =
         "playerName";
 
-    name.innerHTML =
-        escapeHTML(player.name);
+    nameElement.innerHTML =
+        escapeHTML(
+            player.name
+        );
 
-    player.nameElement = name;
+    player.nameElement =
+        nameElement;
 
-    player.element.appendChild(name);
+    player.element.appendChild(
+        nameElement
+    );
 
-    if (player.character === "bonzi") {
-        player.imageElement =
-            document.createElement("img");
+    if (
+        player.character === "bonzi"
+    ) {
+        image =
+            document.createElement(
+                "img"
+            );
 
-        player.imageElement.className =
+        image.className =
             "bonziCharacter";
 
-        player.imageElement.src =
+        image.src =
             "/bonzi.png";
 
-        player.imageElement.alt =
+        image.alt =
             "";
 
+        player.imageElement =
+            image;
+
         player.element.appendChild(
-            player.imageElement
+            image
         );
     }
 
@@ -457,46 +598,59 @@ function createPlayer(data) {
         player.element
     );
 
-    updatePlayerPosition(player);
-    updatePlayerColor(player);
-    setupDragging(player);
+    updatePlayerPosition(
+        player
+    );
+
+    updatePlayerColor(
+        player
+    );
+
+    setupDragging(
+        player
+    );
 
     return player;
 }
 
 
-/* ============================================================
-   HTML ESCAPING
-   ============================================================ */
+/*
+============================================================
+ESCAPE HTML
+============================================================
+*/
 
 function escapeHTML(text) {
     var div;
 
     text = String(text);
 
-    if (document.createElement) {
-        div = document.createElement("div");
-        div.appendChild(
-            document.createTextNode(text)
+    div =
+        document.createElement(
+            "div"
         );
 
-        return div.innerHTML;
-    }
+    div.appendChild(
+        document.createTextNode(
+            text
+        )
+    );
 
-    return text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
+    return div.innerHTML;
 }
 
 
-/* ============================================================
-   PLAYER POSITION
-   ============================================================ */
+/*
+============================================================
+POSITION
+============================================================
+*/
 
 function updatePlayerPosition(player) {
-    if (!player || !player.element) {
+    if (
+        !player ||
+        !player.element
+    ) {
         return;
     }
 
@@ -510,29 +664,36 @@ function updatePlayerPosition(player) {
 function movePlayerFromServer(event) {
     var player;
 
-    if (!event) {
-        return;
-    }
-
-    player = players[event.playerId];
+    player =
+        players[event.playerId];
 
     if (!player) {
         return;
     }
 
-    player.x = event.x;
-    player.y = event.y;
+    player.x =
+        Number(event.x);
 
-    updatePlayerPosition(player);
+    player.y =
+        Number(event.y);
+
+    updatePlayerPosition(
+        player
+    );
 }
 
 
-/* ============================================================
-   DRAGGING
-   ============================================================ */
+/*
+============================================================
+DRAGGING
+============================================================
+*/
 
 function setupDragging(player) {
-    if (!player || !player.element) {
+    if (
+        !player ||
+        !player.element
+    ) {
         return;
     }
 
@@ -562,13 +723,16 @@ function setupDragging(player) {
 function getPointerPosition(event) {
     var touch;
 
-    event = event || window.event;
+    event =
+        event ||
+        window.event;
 
     if (
         event.touches &&
         event.touches.length
     ) {
-        touch = event.touches[0];
+        touch =
+            event.touches[0];
 
         return {
             x: touch.clientX,
@@ -580,7 +744,8 @@ function getPointerPosition(event) {
         event.changedTouches &&
         event.changedTouches.length
     ) {
-        touch = event.changedTouches[0];
+        touch =
+            event.changedTouches[0];
 
         return {
             x: touch.clientX,
@@ -594,26 +759,23 @@ function getPointerPosition(event) {
     };
 }
 
-function beginDrag(player, event) {
-    var pointer;
-
+function beginDrag(
+    player,
+    event
+) {
     if (!player) {
         return;
     }
 
-    event = event || window.event;
+    event =
+        event ||
+        window.event;
 
-    pointer =
-        getPointerPosition(event);
+    draggingPlayer =
+        player;
 
-    draggingPlayer = player;
-    dragging = true;
-
-    draggingPlayer.dragOffsetX =
-        pointer.x;
-
-    draggingPlayer.dragOffsetY =
-        pointer.y;
+    dragging =
+        true;
 
     if (
         player.element.setCapture
@@ -634,29 +796,42 @@ function dragMove(event) {
     var x;
     var y;
 
-    if (!dragging || !draggingPlayer) {
+    if (
+        !dragging ||
+        !draggingPlayer
+    ) {
         return;
     }
 
-    event = event || window.event;
+    event =
+        event ||
+        window.event;
 
     pointer =
-        getPointerPosition(event);
+        getPointerPosition(
+            event
+        );
 
     rect =
         world.getBoundingClientRect();
 
-    if (!rect.width) {
+    if (
+        !rect ||
+        !rect.width ||
+        !rect.height
+    ) {
         return;
     }
 
     x =
         ((pointer.x - rect.left) /
-        rect.width) * 100;
+        rect.width) *
+        100;
 
     y =
         ((pointer.y - rect.top) /
-        rect.height) * 100;
+        rect.height) *
+        100;
 
     if (x < 2) {
         x = 2;
@@ -674,10 +849,21 @@ function dragMove(event) {
         y = 98;
     }
 
-    draggingPlayer.x = x;
-    draggingPlayer.y = y;
+    draggingPlayer.x =
+        x;
+
+    draggingPlayer.y =
+        y;
 
     updatePlayerPosition(
+        draggingPlayer
+    );
+
+    /*
+     * Send continuously so everyone
+     * sees the player moving.
+     */
+    sendPlayerMove(
         draggingPlayer
     );
 
@@ -685,11 +871,16 @@ function dragMove(event) {
 }
 
 function endDrag(event) {
-    if (!dragging || !draggingPlayer) {
+    if (
+        !dragging ||
+        !draggingPlayer
+    ) {
         return;
     }
 
-    event = event || window.event;
+    event =
+        event ||
+        window.event;
 
     sendPlayerMove(
         draggingPlayer
@@ -704,14 +895,20 @@ function endDrag(event) {
         }
     }
 
-    dragging = false;
-    draggingPlayer = null;
+    dragging =
+        false;
+
+    draggingPlayer =
+        null;
 
     preventDefault(event);
 }
 
 function sendPlayerMove(player) {
-    if (!player || !myId) {
+    if (
+        !player ||
+        !myId
+    ) {
         return;
     }
 
@@ -730,12 +927,14 @@ function sendPlayerMove(player) {
 }
 
 
-/* ============================================================
-   COLOR
-   ============================================================ */
+/*
+============================================================
+COLOR
+============================================================
+*/
 
 function getHue(color) {
-    var hues = {
+    var named = {
         red: 0,
         orange: 30,
         yellow: 60,
@@ -752,37 +951,57 @@ function getHue(color) {
     var b;
     var max;
     var min;
-    var h;
     var delta;
+    var h;
 
-    color = String(color).toLowerCase();
+    color =
+        String(color)
+            .toLowerCase();
 
-    if (hues[color] !== undefined) {
-        return hues[color];
+    if (
+        named[color] !== undefined
+    ) {
+        return named[color];
     }
 
     if (
         color.charAt(0) === "#" &&
         color.length === 7
     ) {
-        r = parseInt(
-            color.substr(1, 2),
-            16
-        );
+        r =
+            parseInt(
+                color.substring(1, 3),
+                16
+            );
 
-        g = parseInt(
-            color.substr(3, 2),
-            16
-        );
+        g =
+            parseInt(
+                color.substring(3, 5),
+                16
+            );
 
-        b = parseInt(
-            color.substr(5, 2),
-            16
-        );
+        b =
+            parseInt(
+                color.substring(5, 7),
+                16
+            );
 
-        max = Math.max(r, g, b);
-        min = Math.min(r, g, b);
-        delta = max - min;
+        max =
+            Math.max(
+                r,
+                g,
+                b
+            );
+
+        min =
+            Math.min(
+                r,
+                g,
+                b
+            );
+
+        delta =
+            max - min;
 
         if (delta === 0) {
             return 0;
@@ -816,12 +1035,16 @@ function updatePlayerColor(player) {
     var hue;
     var filter;
 
-    if (!player || !player.element) {
+    if (
+        !player ||
+        !player.element
+    ) {
         return;
     }
 
     if (
-        player.character === "square"
+        player.character ===
+        "square"
     ) {
         player.element.style.backgroundColor =
             player.color;
@@ -830,39 +1053,27 @@ function updatePlayerColor(player) {
     }
 
     if (
-        player.character !== "bonzi" ||
         !player.imageElement
     ) {
         return;
     }
 
-    hue = getHue(player.color);
+    hue =
+        getHue(
+            player.color
+        );
 
-    /*
-     * Original Bonzi image is purple,
-     * approximately 270 degrees.
-     */
     filter =
         "hue-rotate(" +
         (hue - 270) +
         "deg)";
 
-    /*
-     * Modern browsers.
-     */
     player.imageElement.style.filter =
         filter;
 
-    /*
-     * Older IE.
-     */
     player.imageElement.style.msFilter =
         filter;
 
-    /*
-     * CSS custom property for the
-     * stylesheet.
-     */
     try {
         player.imageElement.style.setProperty(
             "--bonzi-hue",
@@ -873,9 +1084,11 @@ function updatePlayerColor(player) {
 }
 
 
-/* ============================================================
-   CHARACTER
-   ============================================================ */
+/*
+============================================================
+CHARACTER
+============================================================
+*/
 
 function changePlayerCharacter(
     player,
@@ -904,17 +1117,23 @@ function changePlayerCharacter(
         player.nameElement;
 
     player.element =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     player.element.className =
         "player";
 
-    if (character === "bonzi") {
+    if (
+        character === "bonzi"
+    ) {
         player.element.className +=
             " bonziPlayer";
 
         image =
-            document.createElement("img");
+            document.createElement(
+                "img"
+            );
 
         image.className =
             "bonziCharacter";
@@ -952,49 +1171,59 @@ function changePlayerCharacter(
         oldElement
     );
 
-    updatePlayerPosition(player);
-    updatePlayerColor(player);
-    setupDragging(player);
+    updatePlayerPosition(
+        player
+    );
+
+    updatePlayerColor(
+        player
+    );
+
+    setupDragging(
+        player
+    );
 }
 
 
-/* ============================================================
-   REMOVE PLAYER
-   ============================================================ */
+/*
+============================================================
+REMOVE PLAYER
+============================================================
+*/
 
 function removePlayer(id) {
-    var player;
-
-    player = players[id];
+    var player =
+        players[id];
 
     if (!player) {
         return;
     }
 
-    if (player.element) {
-        if (player.element.parentNode) {
-            player.element.parentNode.removeChild(
-                player.element
-            );
-        }
+    if (
+        player.element &&
+        player.element.parentNode
+    ) {
+        player.element.parentNode.removeChild(
+            player.element
+        );
     }
 
     delete players[id];
 }
 
 
-/* ============================================================
-   SPEECH BUBBLE
-   ============================================================ */
+/*
+============================================================
+MESSAGES
+============================================================
+*/
 
 function showMessage(
     playerId,
     name,
     text
 ) {
-    var player;
-
-    player =
+    var player =
         players[playerId];
 
     if (!player) {
@@ -1006,7 +1235,9 @@ function showMessage(
         text
     );
 
-    speakText(text);
+    speakText(
+        text
+    );
 }
 
 function showSpeechBubble(
@@ -1015,29 +1246,34 @@ function showSpeechBubble(
 ) {
     var bubble;
 
-    if (!player || !player.element) {
+    if (
+        !player ||
+        !player.element
+    ) {
         return;
     }
 
-    if (player.bubbleElement) {
-        if (
-            player.bubbleElement.parentNode
-        ) {
-            player.bubbleElement.parentNode
-                .removeChild(
-                    player.bubbleElement
-                );
-        }
+    if (
+        player.bubbleElement &&
+        player.bubbleElement.parentNode
+    ) {
+        player.bubbleElement.parentNode.removeChild(
+            player.bubbleElement
+        );
     }
 
     bubble =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     bubble.className =
         "speechBubble";
 
     bubble.innerHTML =
-        escapeHTML(text);
+        escapeHTML(
+            text
+        );
 
     player.element.appendChild(
         bubble
@@ -1052,11 +1288,12 @@ function showSpeechBubble(
                 player.bubbleElement ===
                 bubble
             ) {
-                if (bubble.parentNode) {
+                if (
                     bubble.parentNode
-                        .removeChild(
-                            bubble
-                        );
+                ) {
+                    bubble.parentNode.removeChild(
+                        bubble
+                    );
                 }
 
                 player.bubbleElement =
@@ -1068,44 +1305,20 @@ function showSpeechBubble(
 }
 
 
-/* ============================================================
-   SPEAK.JS TTS
-   ============================================================ */
-
 /*
- * speakClient.js creates the global speak() function.
- *
- * speak.js then:
- *
- * speakClient.js
- *      |
- *      v
- * speakWorker.js
- *      |
- *      v
- * speakGenerator.js
- *      |
- *      v
- * WAV
- *      |
- *      v
- * #audio
- *
- * We only call speak().
- */
+============================================================
+SPEAK.JS
+============================================================
+*/
 
 function speakText(text) {
-    var options;
-
     if (!text) {
         return;
     }
 
-    /*
-     * Commands should never be spoken.
-     * The server normally doesn't broadcast
-     * commands as normal messages anyway.
-     */
+    text =
+        String(text);
+
     if (
         text.charAt(0) === "/"
     ) {
@@ -1113,8 +1326,9 @@ function speakText(text) {
     }
 
     /*
-     * speakClient.js from the original
-     * speak.js project exposes speak().
+     * speakClient.js from speak.js
+     * creates the global speak()
+     * function.
      */
     if (
         typeof window.speak !==
@@ -1123,36 +1337,37 @@ function speakText(text) {
         return;
     }
 
-    options = {
-        amplitude: 100,
-        pitch: 50,
-        speed: 175,
-        wordgap: 0
-    };
-
     try {
         window.speak(
-            String(text),
-            options
+            text,
+            {
+                amplitude: 100,
+                pitch: 50,
+                speed: 175,
+                wordgap: 0
+            }
         );
     } catch (e) {
         /*
-         * If the worker cannot be started,
-         * don't break the chat application.
+         * TTS failure must not break chat.
          */
     }
 }
 
 
-/* ============================================================
-   SYSTEM MESSAGE
-   ============================================================ */
+/*
+============================================================
+SYSTEM MESSAGE
+============================================================
+*/
 
 function showSystemMessage(text) {
     var bubble;
 
     bubble =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
 
     bubble.style.position =
         "fixed";
@@ -1182,19 +1397,22 @@ function showSystemMessage(text) {
         "12px";
 
     bubble.innerHTML =
-        escapeHTML(text);
+        escapeHTML(
+            text
+        );
 
     desktop.appendChild(
         bubble
     );
 
-    window.setTimeout(
+    setTimeout(
         function () {
-            if (bubble.parentNode) {
+            if (
                 bubble.parentNode
-                    .removeChild(
-                        bubble
-                    );
+            ) {
+                bubble.parentNode.removeChild(
+                    bubble
+                );
             }
         },
         3000
@@ -1202,22 +1420,34 @@ function showSystemMessage(text) {
 }
 
 
-/* ============================================================
-   SEND MESSAGE
-   ============================================================ */
+/*
+============================================================
+SEND MESSAGE
+============================================================
+*/
 
 function sendMessage() {
     var text;
 
+    if (!myId) {
+        return;
+    }
+
     text =
         messageInput.value;
+
+    text =
+        String(text)
+            .replace(/^\s+|\s+$/g, "");
 
     if (!text) {
         return;
     }
 
-    messageInput.value =
-        "";
+    /*
+     * Clear the input immediately.
+     */
+    messageInput.value = "";
 
     ajax(
         "POST",
@@ -1226,15 +1456,31 @@ function sendMessage() {
             id: myId,
             text: text
         },
-        function () {
+        function (status, response) {
+            if (status !== 200) {
+                /*
+                 * Put the message back if
+                 * the server rejected it.
+                 */
+                messageInput.value =
+                    text;
+
+                showSystemMessage(
+                    "Message failed to send (" +
+                    status +
+                    ")."
+                );
+            }
         }
     );
 }
 
 
-/* ============================================================
-   SETTINGS
-   ============================================================ */
+/*
+============================================================
+SETTINGS
+============================================================
+*/
 
 function openSettings() {
     if (!settingsPanel) {
@@ -1255,9 +1501,11 @@ function closeSettings() {
 }
 
 
-/* ============================================================
-   GLOBAL DRAG EVENTS
-   ============================================================ */
+/*
+============================================================
+GLOBAL DRAG EVENTS
+============================================================
+*/
 
 function setupGlobalDragging() {
     addEvent(
@@ -1292,9 +1540,11 @@ function setupGlobalDragging() {
 }
 
 
-/* ============================================================
-   INITIALIZATION
-   ============================================================ */
+/*
+============================================================
+INITIALIZATION
+============================================================
+*/
 
 function initialize() {
     world =
@@ -1330,12 +1580,21 @@ function initialize() {
     settingsClose =
         $("settingsClose");
 
+
+    /*
+    --------------------------------------------------------
+    LOGIN
+    --------------------------------------------------------
+    */
+
     addEvent(
         submitButton,
         "click",
         function (event) {
             preventDefault(event);
             joinRoom();
+
+            return false;
         }
     );
 
@@ -1344,10 +1603,16 @@ function initialize() {
         "keypress",
         function (event) {
             event =
-                event || window.event;
+                event ||
+                window.event;
 
-            if (event.keyCode === 13) {
+            if (
+                event.keyCode === 13
+            ) {
+                preventDefault(event);
                 joinRoom();
+
+                return false;
             }
         }
     );
@@ -1357,13 +1622,26 @@ function initialize() {
         "keypress",
         function (event) {
             event =
-                event || window.event;
+                event ||
+                window.event;
 
-            if (event.keyCode === 13) {
+            if (
+                event.keyCode === 13
+            ) {
+                preventDefault(event);
                 joinRoom();
+
+                return false;
             }
         }
     );
+
+
+    /*
+    --------------------------------------------------------
+    MESSAGE BUTTON
+    --------------------------------------------------------
+    */
 
     addEvent(
         startButton,
@@ -1371,21 +1649,43 @@ function initialize() {
         function (event) {
             preventDefault(event);
             sendMessage();
+
+            return false;
         }
     );
+
+
+    /*
+    --------------------------------------------------------
+    MESSAGE ENTER
+    --------------------------------------------------------
+    */
 
     addEvent(
         messageInput,
         "keypress",
         function (event) {
             event =
-                event || window.event;
+                event ||
+                window.event;
 
-            if (event.keyCode === 13) {
+            if (
+                event.keyCode === 13
+            ) {
+                preventDefault(event);
                 sendMessage();
+
+                return false;
             }
         }
     );
+
+
+    /*
+    --------------------------------------------------------
+    SETTINGS
+    --------------------------------------------------------
+    */
 
     addEvent(
         settingsButton,
@@ -1393,6 +1693,8 @@ function initialize() {
         function (event) {
             preventDefault(event);
             openSettings();
+
+            return false;
         }
     );
 
@@ -1402,16 +1704,27 @@ function initialize() {
         function (event) {
             preventDefault(event);
             closeSettings();
+
+            return false;
         }
     );
+
+
+    /*
+    --------------------------------------------------------
+    DRAGGING
+    --------------------------------------------------------
+    */
 
     setupGlobalDragging();
 }
 
 
-/* ============================================================
-   LEAVE
-   ============================================================ */
+/*
+============================================================
+LEAVE
+============================================================
+*/
 
 function leaveChat() {
     if (!myId) {
@@ -1433,9 +1746,11 @@ function leaveChat() {
 }
 
 
-/* ============================================================
-   START
-   ============================================================ */
+/*
+============================================================
+START
+============================================================
+*/
 
 addEvent(
     window,
