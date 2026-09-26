@@ -1,162 +1,498 @@
-const socket = io();
+var myId = null;
+var myName = "";
+var currentRoom = "";
 
+var players = {};
 
-/*
-============================================================
-ELEMENTS
-============================================================
-*/
+var draggingPlayer = null;
+var dragging = false;
 
-const loginScreen =
-    document.getElementById("loginScreen");
+var pollTimer = null;
+var pollInProgress = false;
 
-const desktop =
-    document.getElementById("desktop");
+var loginScreen;
+var desktop;
+var nameInput;
+var roomInput;
+var submitButton;
+var world;
+var messageInput;
+var startButton;
+var settingsButton;
+var settingsPanel;
+var closeSettings;
 
-const nameInput =
-    document.getElementById("nameInput");
-
-const roomInput =
-    document.getElementById("roomInput");
-
-const submitButton =
-    document.getElementById("submitButton");
-
-const world =
-    document.getElementById("world");
-
-const messageInput =
-    document.getElementById("messageInput");
-
-const startButton =
-    document.getElementById("startButton");
-
-const settingsButton =
-    document.getElementById("settingsButton");
-
-const settingsPanel =
-    document.getElementById("settingsPanel");
-
-const closeSettings =
-    document.getElementById("closeSettings");
-
-
-/*
-============================================================
-PLAYER STATE
-============================================================
-*/
-
-const players = {};
-
-let myId = null;
-
-let myName = "";
-
-let currentRoom = "default";
-
-
-/*
-============================================================
-ESPEAK STATE
-============================================================
-*/
-
-/*
-Every message gets its own audio element.
-
-There is intentionally NO global audio queue.
-
-Therefore:
-
-Player A
-Player B
-Player C
-
-can all be speaking at the same time.
-*/
-
-let myEspeakAudio = null;
-
-const audioContainer =
-    document.getElementById("audio");
-
-const espeakPlaybackContainer =
-    document.getElementById(
-        "espeakPlaybackContainer"
-    );
-
-
-/*
-============================================================
-DEFAULT ROOM
-============================================================
-*/
-
-if (roomInput) {
-    roomInput.value = "default";
+function $(id) {
+    return document.getElementById(id);
 }
 
+function addEvent(element, name, handler) {
+    if (!element) {
+        return;
+    }
 
-/*
-============================================================
-SETTINGS
-============================================================
-*/
+    if (element.attachEvent) {
+        element.attachEvent("on" + name, handler);
+    } else if (element.addEventListener) {
+        element.addEventListener(name, handler, false);
+    }
+}
 
-if (settingsButton) {
+function preventDefault(event) {
+    event = event || window.event;
 
-    settingsButton.addEventListener(
-        "click",
-        () => {
+    if (event.preventDefault) {
+        event.preventDefault();
+    }
 
-            if (
-                settingsPanel.style.display ===
-                "block"
-            ) {
+    event.returnValue = false;
+}
 
-                settingsPanel.style.display =
-                    "none";
+function stopEvent(event) {
+    event = event || window.event;
 
-            } else {
+    if (event.stopPropagation) {
+        event.stopPropagation();
+    }
 
-                settingsPanel.style.display =
-                    "block";
+    event.cancelBubble = true;
+}
+
+function ajax(method, address, data, callback) {
+    var xhr = new XMLHttpRequest();
+    var body = "";
+    var key;
+
+    if (data) {
+        for (key in data) {
+            if (data.hasOwnProperty(key)) {
+                if (body !== "") {
+                    body += "&";
+                }
+
+                body += encodeURIComponent(key);
+                body += "=";
+                body += encodeURIComponent(data[key]);
+            }
+        }
+    }
+
+    xhr.open(method, address, true);
+
+    if (method === "POST") {
+        xhr.setRequestHeader(
+            "Content-Type",
+            "application/x-www-form-urlencoded"
+        );
+    }
+
+    xhr.onreadystatechange = function () {
+        var result;
+
+        if (xhr.readyState !== 4) {
+            return;
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+                result = JSON.parse(xhr.responseText);
+            } catch (e) {
+                result = null;
+            }
+
+            if (callback) {
+                callback(result);
+            }
+        } else {
+            if (callback) {
+                callback(null);
+            }
+        }
+    };
+
+    xhr.send(body);
+}
+
+function joinRoom() {
+    var name = nameInput.value;
+    var room = roomInput.value;
+
+    if (!name) {
+        name = "Anonymous";
+    }
+
+    if (!room) {
+        room = "default";
+    }
+
+    myName = name;
+    currentRoom = room;
+
+    submitButton.disabled = true;
+
+    ajax(
+        "POST",
+        "/api/join",
+        {
+            name: name,
+            room: room
+        },
+        function (result) {
+            var i;
+
+            submitButton.disabled = false;
+
+            if (!result || !result.id) {
+                alert("Could not connect to the chat server.");
+                return;
+            }
+
+            myId = String(result.id);
+
+            loginScreen.style.display = "none";
+            desktop.style.display = "block";
+
+            createPlayer(result.player);
+
+            if (result.player) {
+                currentRoom = result.player.room;
+            }
+
+            startPolling();
+
+            for (i = 0; i < result.events.length; i++) {
+                handleEvent(result.events[i]);
             }
         }
     );
 }
 
+function startPolling() {
+    if (pollTimer) {
+        window.clearTimeout(pollTimer);
+    }
 
-if (closeSettings) {
+    poll();
+}
 
-    closeSettings.addEventListener(
-        "click",
-        () => {
+function poll() {
+    if (!myId || pollInProgress) {
+        return;
+    }
 
-            settingsPanel.style.display =
-                "none";
+    pollInProgress = true;
 
+    ajax(
+        "GET",
+        "/api/poll?id=" + encodeURIComponent(myId) + "&t=" + new Date().getTime(),
+        null,
+        function (result) {
+            var i;
+
+            pollInProgress = false;
+
+            if (result && result.events) {
+                for (i = 0; i < result.events.length; i++) {
+                    handleEvent(result.events[i]);
+                }
+            }
+
+            pollTimer = window.setTimeout(poll, 20);
         }
     );
 }
 
-
-/*
-============================================================
-COLOR → HUE
-============================================================
-*/
-
-function colorToHue(color) {
-
-    if (!color) {
-        return 270;
+function handleEvent(event) {
+    if (!event) {
+        return;
     }
 
+    if (event.event === "playerJoined") {
+        createPlayer(event.data);
+        return;
+    }
 
-    const colors = {
+    if (event.event === "playerMoved") {
+        movePlayer(
+            event.data.id,
+            event.data.x,
+            event.data.y
+        );
 
+        return;
+    }
+
+    if (event.event === "playerColorChanged") {
+        changePlayerColor(
+            event.data.id,
+            event.data.color
+        );
+
+        return;
+    }
+
+    if (event.event === "playerCharacterChanged") {
+        changePlayerCharacter(
+            event.data.id,
+            event.data.character
+        );
+
+        return;
+    }
+
+    if (event.event === "playerLeft") {
+        removePlayer(event.data.id);
+        return;
+    }
+
+    if (event.event === "message") {
+        showMessage(
+            event.data.id,
+            event.data.text
+        );
+
+        return;
+    }
+
+    if (event.event === "systemMessage") {
+        showSystemMessage(event.data.text);
+    }
+}
+
+function createPlayer(data) {
+    var player;
+    var element;
+    var name;
+    var character;
+
+    if (!data || !data.id) {
+        return;
+    }
+
+    if (players[String(data.id)]) {
+        return;
+    }
+
+    player = {
+        id: String(data.id),
+        name: data.name || "Anonymous",
+        room: data.room || currentRoom,
+        x: parseFloat(data.x),
+        y: parseFloat(data.y),
+        color: data.color || "#8800ff",
+        character: data.character || "bonzi",
+        element: null,
+        bubble: null,
+        audio: null
+    };
+
+    element = document.createElement("div");
+    element.className = "player";
+
+    if (player.character === "bonzi") {
+        element.className += " bonziPlayer";
+    }
+
+    name = document.createElement("div");
+    name.className = "playerName";
+    name.appendChild(
+        document.createTextNode(player.name)
+    );
+
+    element.appendChild(name);
+
+    if (player.character === "bonzi") {
+        character = document.createElement("img");
+
+        character.className = "bonziCharacter";
+        character.src = "/bonzi.png";
+        character.alt = "";
+
+        element.appendChild(character);
+    } else {
+        character = document.createElement("div");
+        character.className = "squareCharacter";
+
+        element.appendChild(character);
+    }
+
+    player.element = element;
+
+    world.appendChild(element);
+
+    players[player.id] = player;
+
+    updatePlayerPosition(player);
+    updatePlayerColor(player);
+    setupDragging(player);
+}
+
+function updatePlayerPosition(player) {
+    if (!player || !player.element) {
+        return;
+    }
+
+    player.element.style.left = player.x + "%";
+    player.element.style.top = player.y + "%";
+}
+
+function movePlayer(id, x, y) {
+    var player;
+
+    id = String(id);
+
+    player = players[id];
+
+    if (!player) {
+        return;
+    }
+
+    player.x = parseFloat(x);
+    player.y = parseFloat(y);
+
+    updatePlayerPosition(player);
+}
+
+function setupDragging(player) {
+    var element = player.element;
+
+    addEvent(element, "mousedown", function (event) {
+        beginDrag(player, event);
+    });
+
+    addEvent(element, "touchstart", function (event) {
+        beginDrag(player, event);
+    });
+
+    addEvent(element, "pointerdown", function (event) {
+        beginDrag(player, event);
+    });
+}
+
+function getPointerPosition(event) {
+    var x;
+    var y;
+    var touch;
+
+    event = event || window.event;
+
+    if (event.touches && event.touches.length) {
+        touch = event.touches[0];
+
+        return {
+            x: touch.clientX,
+            y: touch.clientY
+        };
+    }
+
+    if (event.changedTouches && event.changedTouches.length) {
+        touch = event.changedTouches[0];
+
+        return {
+            x: touch.clientX,
+            y: touch.clientY
+        };
+    }
+
+    x = event.clientX;
+    y = event.clientY;
+
+    return {
+        x: x,
+        y: y
+    };
+}
+
+function beginDrag(player, event) {
+    if (!player) {
+        return;
+    }
+
+    event = event || window.event;
+
+    draggingPlayer = player;
+    dragging = true;
+
+    preventDefault(event);
+    stopEvent(event);
+}
+
+function dragMove(event) {
+    var worldRect;
+    var pointer;
+    var x;
+    var y;
+
+    if (!dragging || !draggingPlayer) {
+        return;
+    }
+
+    event = event || window.event;
+
+    pointer = getPointerPosition(event);
+
+    worldRect = {
+        left: world.offsetLeft,
+        top: world.offsetTop,
+        width: world.clientWidth,
+        height: world.clientHeight
+    };
+
+    x = ((pointer.x - worldRect.left) / worldRect.width) * 100;
+    y = ((pointer.y - worldRect.top) / worldRect.height) * 100;
+
+    x = Math.max(2, Math.min(98, x));
+    y = Math.max(2, Math.min(98, y));
+
+    draggingPlayer.x = x;
+    draggingPlayer.y = y;
+
+    updatePlayerPosition(draggingPlayer);
+
+    ajax(
+        "POST",
+        "/api/move",
+        {
+            senderId: myId,
+            playerId: draggingPlayer.id,
+            x: x,
+            y: y
+        },
+        null
+    );
+
+    preventDefault(event);
+}
+
+function endDrag(event) {
+    if (!dragging) {
+        return;
+    }
+
+    dragging = false;
+    draggingPlayer = null;
+
+    event = event || window.event;
+
+    preventDefault(event);
+}
+
+function changePlayerColor(id, color) {
+    var player;
+
+    player = players[String(id)];
+
+    if (!player) {
+        return;
+    }
+
+    player.color = color;
+
+    updatePlayerColor(player);
+}
+
+function colorToHue(color) {
+    var named = {
         red: 0,
         orange: 30,
         yellow: 60,
@@ -166,1306 +502,439 @@ function colorToHue(color) {
         purple: 270,
         magenta: 300,
         pink: 330
-
     };
 
+    var r;
+    var g;
+    var b;
+    var max;
+    var min;
+    var h;
+    var parts;
 
-    color =
-        String(color).toLowerCase();
+    color = String(color).toLowerCase();
 
-
-    if (
-        colors[color] !== undefined
-    ) {
-
-        return colors[color];
+    if (named[color] !== undefined) {
+        return named[color];
     }
 
-
-    const hexColors = {
-
-        "#ff0000": 0,
-        "#00ff00": 120,
-        "#0000ff": 240,
-        "#ffff00": 60,
-        "#ff00ff": 300,
-        "#00ffff": 180,
-        "#ff8800": 30,
-        "#8800ff": 270,
-        "#00aa88": 168,
-        "#ff66aa": 330,
-        "#6666ff": 240,
-        "#66cc66": 120,
-        "#ffffff": 270
-
-    };
-
-
-    if (
-        hexColors[color] !== undefined
-    ) {
-
-        return hexColors[color];
+    if (color.charAt(0) !== "#" || color.length !== 7) {
+        return 270;
     }
 
+    r = parseInt(color.substring(1, 3), 16) / 255;
+    g = parseInt(color.substring(3, 5), 16) / 255;
+    b = parseInt(color.substring(5, 7), 16) / 255;
 
-    return 270;
-}
+    max = Math.max(r, g, b);
+    min = Math.min(r, g, b);
 
-
-/*
-============================================================
-UPDATE PLAYER COLOR
-============================================================
-*/
-
-function updatePlayerColor(
-    player,
-    color
-) {
-
-    player.color =
-        color;
-
-
-    const bonzi =
-        player.element.querySelector(
-            ".bonziCharacter"
-        );
-
-
-    if (bonzi) {
-
-        const hue =
-            colorToHue(color);
-
-
-        bonzi.style.setProperty(
-            "--bonzi-hue",
-            `${hue - 270}deg`
-        );
+    if (max === min) {
+        return 0;
     }
 
-
-    if (
-        player.character === "square"
-    ) {
-
-        player.element.style.backgroundColor =
-            color;
-    }
-}
-
-
-/*
-============================================================
-CREATE PLAYER
-============================================================
-*/
-
-function createPlayer(data) {
-
-    if (
-        players[data.id]
-    ) {
-
-        return players[data.id];
-    }
-
-
-    const element =
-        document.createElement("div");
-
-
-    element.className =
-        "player";
-
-
-    element.dataset.id =
-        data.id;
-
-
-    /*
-    PLAYER NAME
-    */
-
-    const nameLabel =
-        document.createElement("div");
-
-
-    nameLabel.className =
-        "playerName";
-
-
-    nameLabel.textContent =
-        data.name;
-
-
-    element.appendChild(
-        nameLabel
-    );
-
-
-    /*
-    POSITION
-    */
-
-    element.style.left =
-        `${data.x}%`;
-
-
-    element.style.top =
-        `${data.y}%`;
-
-
-    /*
-    PLAYER DATA
-    */
-
-    const player = {
-
-        id:
-            data.id,
-
-        name:
-            data.name,
-
-        x:
-            Number(data.x),
-
-        y:
-            Number(data.y),
-
-        color:
-            data.color ||
-            "#8000ff",
-
-        character:
-            data.character ||
-            "bonzi",
-
-        element:
-            element
-
-    };
-
-
-    /*
-    CHARACTER
-    */
-
-    if (
-        player.character === "bonzi"
-    ) {
-
-        element.classList.add(
-            "bonziPlayer"
-        );
-
-
-        const image =
-            document.createElement("img");
-
-
-        image.src =
-            "/bonzi.png";
-
-
-        image.className =
-            "bonziCharacter";
-
-
-        image.draggable =
-            false;
-
-
-        element.appendChild(
-            image
-        );
-
+    if (max === r) {
+        h = ((g - b) / (max - min)) % 6;
+    } else if (max === g) {
+        h = ((b - r) / (max - min)) + 2;
     } else {
-
-        element.classList.add(
-            "squareCharacter"
-        );
-
-
-        element.style.backgroundColor =
-            player.color;
+        h = ((r - g) / (max - min)) + 4;
     }
 
+    h *= 60;
 
-    /*
-    ADD TO WORLD
-    */
-
-    world.appendChild(
-        element
-    );
-
-
-    /*
-    SAVE PLAYER
-    */
-
-    players[data.id] =
-        player;
-
-
-    /*
-    APPLY COLOR
-    */
-
-    updatePlayerColor(
-        player,
-        player.color
-    );
-
-
-    /*
-    EVERY PLAYER CAN BE DRAGGED
-    */
-
-    setupDragging(
-        player
-    );
-
-
-    if (
-        data.id === myId
-    ) {
-
-        element.classList.add(
-            "myPlayer"
-        );
+    if (h < 0) {
+        h += 360;
     }
 
-
-    return player;
+    return h;
 }
 
+function updatePlayerColor(player) {
+    var elements;
+    var i;
+    var hue;
+    var shift;
 
-/*
-============================================================
-CHANGE CHARACTER
-============================================================
-*/
-
-function updatePlayerCharacter(
-    player,
-    character
-) {
-
-    player.character =
-        character;
-
-
-    const oldBonzi =
-        player.element.querySelector(
-            ".bonziCharacter"
-        );
-
-
-    if (oldBonzi) {
-        oldBonzi.remove();
-    }
-
-
-    player.element.classList.remove(
-        "bonziPlayer",
-        "squareCharacter"
-    );
-
-
-    player.element.style.backgroundColor =
-        "";
-
-
-    if (
-        character === "bonzi"
-    ) {
-
-        player.element.classList.add(
-            "bonziPlayer"
-        );
-
-
-        const image =
-            document.createElement("img");
-
-
-        image.src =
-            "/bonzi.png";
-
-
-        image.className =
-            "bonziCharacter";
-
-
-        image.draggable =
-            false;
-
-
-        player.element.appendChild(
-            image
-        );
-
-
-        updatePlayerColor(
-            player,
-            player.color
-        );
-
-
+    if (!player || !player.element) {
         return;
     }
 
+    elements = player.element.getElementsByTagName("div");
 
-    if (
-        character === "square"
-    ) {
+    hue = colorToHue(player.color);
 
-        player.element.classList.add(
-            "squareCharacter"
-        );
+    shift = hue - 270;
 
+    for (i = 0; i < elements.length; i++) {
+        if (elements[i].className === "squareCharacter") {
+            elements[i].style.backgroundColor = player.color;
+        }
+    }
 
-        player.element.style.backgroundColor =
-            player.color;
+    /*
+     * IE7-IE11 do not support CSS variables.
+     * The Bonzi image therefore uses an IE-compatible
+     * filter when available.
+     */
+
+    var images = player.element.getElementsByTagName("img");
+
+    for (i = 0; i < images.length; i++) {
+        if (images[i].className === "bonziCharacter") {
+            if (images[i].style.filter !== undefined) {
+                images[i].style.filter =
+                    "hue-rotate(" + shift + "deg)";
+            }
+
+            if (images[i].style.msFilter !== undefined) {
+                images[i].style.msFilter =
+                    "hue-rotate(" + shift + "deg)";
+            }
+        }
     }
 }
 
+function changePlayerCharacter(id, character) {
+    var player;
+    var oldImages;
+    var oldSquares;
+    var name;
+    var image;
+    var square;
 
-/*
-============================================================
-DRAGGING
-============================================================
-*/
+    player = players[String(id)];
 
-function setupDragging(player) {
+    if (!player) {
+        return;
+    }
 
-    let dragging = false;
+    player.character = character;
 
+    while (player.element.childNodes.length > 0) {
+        player.element.removeChild(
+            player.element.childNodes[
+                player.element.childNodes.length - 1
+            ]
+        );
+    }
 
-    player.element.style.cursor =
-        "grab";
-
-
-    player.element.style.touchAction =
-        "none";
-
-
-    player.element.style.userSelect =
-        "none";
-
-
-    /*
-    ========================================================
-    POINTER DOWN
-    ========================================================
-    */
-
-    player.element.addEventListener(
-        "pointerdown",
-        (event) => {
-
-            dragging = true;
-
-
-            player.element.style.cursor =
-                "grabbing";
-
-
-            try {
-
-                player.element.setPointerCapture(
-                    event.pointerId
-                );
-
-            } catch (error) {
-
-                console.log(
-                    "Pointer capture unavailable."
-                );
-            }
-
-
-            event.preventDefault();
-
-            event.stopPropagation();
-        }
+    name = document.createElement("div");
+    name.className = "playerName";
+    name.appendChild(
+        document.createTextNode(player.name)
     );
 
+    player.element.appendChild(name);
 
-    /*
-    ========================================================
-    POINTER MOVE
-    ========================================================
-    */
+    if (character === "bonzi") {
+        player.element.className = "player bonziPlayer";
 
-    player.element.addEventListener(
-        "pointermove",
-        (event) => {
+        image = document.createElement("img");
+        image.className = "bonziCharacter";
+        image.src = "/bonzi.png";
+        image.alt = "";
 
-            if (!dragging) {
-                return;
-            }
+        player.element.appendChild(image);
+    } else {
+        player.element.className = "player";
 
+        square = document.createElement("div");
+        square.className = "squareCharacter";
 
-            const rect =
-                world.getBoundingClientRect();
+        player.element.appendChild(square);
+    }
 
+    updatePlayerPosition(player);
+    updatePlayerColor(player);
+}
 
-            if (
-                rect.width <= 0 ||
-                rect.height <= 0
-            ) {
+function removePlayer(id) {
+    var player;
 
-                return;
-            }
+    player = players[String(id)];
 
+    if (!player) {
+        return;
+    }
 
-            let x =
-                (
-                    (
-                        event.clientX -
-                        rect.left
-                    ) /
-                    rect.width
-                ) * 100;
+    if (player.audio) {
+        try {
+            player.audio.pause();
+        } catch (e) {}
 
+        player.audio = null;
+    }
 
-            let y =
-                (
-                    (
-                        event.clientY -
-                        rect.top
-                    ) /
-                    rect.height
-                ) * 100;
+    if (player.bubble && player.bubble.parentNode) {
+        player.bubble.parentNode.removeChild(player.bubble);
+    }
 
+    if (player.element && player.element.parentNode) {
+        player.element.parentNode.removeChild(player.element);
+    }
 
-            x =
-                Math.max(
-                    2,
-                    Math.min(
-                        98,
-                        x
-                    )
-                );
+    delete players[String(id)];
+}
 
+function showMessage(id, text) {
+    var player;
 
-            y =
-                Math.max(
-                    2,
-                    Math.min(
-                        98,
-                        y
-                    )
-                );
+    player = players[String(id)];
 
+    if (!player) {
+        return;
+    }
 
-            /*
-            Update the dragged player locally.
-            */
+    showSpeechBubble(player, text);
+    generateSpeech(player, text);
+}
 
-            player.x =
-                x;
+function showSpeechBubble(player, text) {
+    var bubble;
+    var arrow;
+    var inner;
 
+    if (player.bubble && player.bubble.parentNode) {
+        player.bubble.parentNode.removeChild(
+            player.bubble
+        );
+    }
 
-            player.y =
-                y;
+    bubble = document.createElement("div");
+    bubble.className = "speechBubble";
 
-
-            player.element.style.left =
-                `${x}%`;
-
-
-            player.element.style.top =
-                `${y}%`;
-
-
-            /*
-            IMPORTANT:
-
-            Send the ID of the character being dragged.
-
-            This allows everybody to move anybody.
-            */
-
-            socket.emit(
-                "move",
-                {
-                    playerId:
-                        player.id,
-
-                    x:
-                        x,
-
-                    y:
-                        y
-                }
-            );
-
-
-            event.preventDefault();
-        }
+    bubble.appendChild(
+        document.createTextNode(text)
     );
 
+    arrow = document.createElement("div");
+    arrow.className = "speechBubbleArrow";
+
+    inner = document.createElement("div");
+    inner.className = "speechBubbleArrowInner";
+
+    arrow.appendChild(inner);
+    bubble.appendChild(arrow);
+
+    player.element.appendChild(bubble);
+
+    player.bubble = bubble;
+
+    window.setTimeout(function () {
+        if (
+            player.bubble === bubble &&
+            bubble.parentNode
+        ) {
+            bubble.parentNode.removeChild(bubble);
+            player.bubble = null;
+        }
+    }, 5000);
+}
+
+function generateSpeech(player, text) {
+    var xhr;
+    var audio;
+    var result;
 
     /*
-    ========================================================
-    STOP DRAGGING
-    ========================================================
-    */
+     * HTML5 audio is intentionally used here.
+     *
+     * IE7 and IE8 do not have HTML5 audio, so those
+     * browsers simply receive the chat message without
+     * spoken playback.
+     */
 
-    function stopDragging(event) {
+    if (!document.createElement("audio").canPlayType) {
+        return;
+    }
 
-        if (!dragging) {
+    xhr = new XMLHttpRequest();
+
+    xhr.open(
+        "GET",
+        "/api/tts?text=" + encodeURIComponent(text),
+        true
+    );
+
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) {
             return;
         }
 
-
-        dragging = false;
-
-
-        player.element.style.cursor =
-            "grab";
-
+        if (xhr.status < 200 || xhr.status >= 300) {
+            return;
+        }
 
         try {
-
-            player.element.releasePointerCapture(
-                event.pointerId
-            );
-
-        } catch (error) {
-
-            // Already released.
+            result = JSON.parse(xhr.responseText);
+        } catch (e) {
+            return;
         }
-    }
 
-
-    player.element.addEventListener(
-        "pointerup",
-        stopDragging
-    );
-
-
-    player.element.addEventListener(
-        "pointercancel",
-        stopDragging
-    );
-
-
-    player.element.addEventListener(
-        "lostpointercapture",
-        () => {
-
-            dragging = false;
-
-            player.element.style.cursor =
-                "grab";
+        if (!result || !result.url) {
+            return;
         }
-    );
+
+        audio = document.createElement("audio");
+
+        audio.className = "ttsAudio";
+        audio.setAttribute("preload", "auto");
+
+        audio.src = result.url;
+
+        /*
+         * Do not cancel other people's audio.
+         * Every message gets its own HTML5 audio element.
+         */
+
+        document.body.appendChild(audio);
+
+        player.audio = audio;
+
+        try {
+            audio.play();
+        } catch (e) {}
+
+        addEvent(audio, "ended", function () {
+            if (audio.parentNode) {
+                audio.parentNode.removeChild(audio);
+            }
+
+            if (player.audio === audio) {
+                player.audio = null;
+            }
+        });
+    };
+
+    xhr.send(null);
 }
-
-
-/*
-============================================================
-LOGIN
-============================================================
-*/
-
-function joinRoom() {
-
-    let name =
-        nameInput.value.trim();
-
-
-    let room =
-        roomInput.value.trim();
-
-
-    if (!name) {
-        name = "Anonymous";
-    }
-
-
-    if (!room) {
-        room = "default";
-    }
-
-
-    myName =
-        name;
-
-
-    currentRoom =
-        room;
-
-
-    socket.emit(
-        "joinRoom",
-        {
-            name:
-                name,
-
-            room:
-                room
-        }
-    );
-}
-
-
-submitButton.addEventListener(
-    "click",
-    joinRoom
-);
-
-
-nameInput.addEventListener(
-    "keydown",
-    (event) => {
-
-        if (
-            event.key === "Enter"
-        ) {
-
-            joinRoom();
-        }
-    }
-);
-
-
-roomInput.addEventListener(
-    "keydown",
-    (event) => {
-
-        if (
-            event.key === "Enter"
-        ) {
-
-            joinRoom();
-        }
-    }
-);
-
-
-/*
-============================================================
-JOINED
-============================================================
-*/
-
-socket.on(
-    "joined",
-    (data) => {
-
-        myId =
-            data.id;
-
-
-        loginScreen.style.display =
-            "none";
-
-
-        desktop.style.display =
-            "block";
-
-
-        createPlayer(
-            data
-        );
-    }
-);
-
-
-/*
-============================================================
-PLAYER JOINED
-============================================================
-*/
-
-socket.on(
-    "playerJoined",
-    (data) => {
-
-        createPlayer(
-            data
-        );
-    }
-);
-
-
-/*
-============================================================
-PLAYER MOVED
-============================================================
-*/
-
-socket.on(
-    "playerMoved",
-    (data) => {
-
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
-
-
-        player.x =
-            Number(data.x);
-
-
-        player.y =
-            Number(data.y);
-
-
-        player.element.style.left =
-            `${player.x}%`;
-
-
-        player.element.style.top =
-            `${player.y}%`;
-    }
-);
-
-
-/*
-============================================================
-PLAYER COLOR CHANGED
-============================================================
-*/
-
-socket.on(
-    "playerColorChanged",
-    (data) => {
-
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
-
-
-        updatePlayerColor(
-            player,
-            data.color
-        );
-    }
-);
-
-
-/*
-============================================================
-PLAYER CHARACTER CHANGED
-============================================================
-*/
-
-socket.on(
-    "playerCharacterChanged",
-    (data) => {
-
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
-
-
-        updatePlayerCharacter(
-            player,
-            data.character
-        );
-    }
-);
-
-
-/*
-============================================================
-PLAYER LEFT
-============================================================
-*/
-
-socket.on(
-    "playerLeft",
-    (data) => {
-
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
-
-
-        player.element.remove();
-
-
-        delete players[data.id];
-    }
-);
-
-
-/*
-============================================================
-CHAT MESSAGE
-============================================================
-*/
-
-socket.on(
-    "message",
-    (data) => {
-
-        const player =
-            players[data.id];
-
-
-        if (!player) {
-            return;
-        }
-
-
-        showSpeechBubble(
-            player,
-            data.text
-        );
-    }
-);
-
-
-/*
-============================================================
-SYSTEM MESSAGE
-============================================================
-*/
-
-socket.on(
-    "systemMessage",
-    (data) => {
-
-        console.log(
-            "System:",
-            data.text
-        );
-    }
-);
-
-
-/*
-============================================================
-SPEECH BUBBLE
-============================================================
-*/
-
-function showSpeechBubble(
-    player,
-    text
-) {
-
-    /*
-    A player only has one visible bubble.
-
-    This does NOT affect audio.
-    */
-
-    const oldBubble =
-        player.element.querySelector(
-            ".speechBubble"
-        );
-
-
-    if (oldBubble) {
-        oldBubble.remove();
-    }
-
-
-    const bubble =
-        document.createElement("div");
-
-
-    bubble.className =
-        "speechBubble";
-
-
-    bubble.textContent =
-        text;
-
-
-    player.element.appendChild(
-        bubble
-    );
-
-
-    speakWithEspeak(
-        player,
-        text,
-        bubble
-    );
-}
-
-
-/*
-============================================================
-ESPEAK
-============================================================
-*/
-
-function speakWithEspeak(
-    player,
-    text,
-    bubble
-) {
-
-    if (
-        typeof speak !== "function"
-    ) {
-
-        console.error(
-            "eSpeak is not loaded."
-        );
-
-
-        setTimeout(
-            () => {
-
-                if (
-                    bubble.parentNode
-                ) {
-
-                    bubble.remove();
-                }
-
-            },
-            5000
-        );
-
-
-        return;
-    }
-
-
-    if (!audioContainer) {
-
-        return;
-    }
-
-
-    /*
-    Clear ONLY the generator container.
-
-    Existing playback has already been moved
-    somewhere else.
-    */
-
-    audioContainer.innerHTML =
-        "";
-
-
-    /*
-    Generate this message.
-    */
-
-    speak(
-        text,
-        {
-            amplitude:
-                100,
-
-            pitch:
-                50,
-
-            speed:
-                175,
-
-            voice:
-                "en/en-us"
-        }
-    );
-
-
-    let attempts =
-        0;
-
-
-    const waitForAudio =
-        setInterval(
-            () => {
-
-                attempts++;
-
-
-                const audio =
-                    audioContainer.querySelector(
-                        "audio"
-                    );
-
-
-                if (!audio) {
-
-                    if (
-                        attempts >= 200
-                    ) {
-
-                        clearInterval(
-                            waitForAudio
-                        );
-
-
-                        if (
-                            bubble.parentNode
-                        ) {
-
-                            bubble.remove();
-                        }
-                    }
-
-
-                    return;
-                }
-
-
-                clearInterval(
-                    waitForAudio
-                );
-
-
-                /*
-                ====================================================
-                MOVE AUDIO OUT OF GENERATOR
-                ====================================================
-
-                speakClient.js reuses #audio.
-
-                We immediately remove this audio from
-                #audio so future speech cannot delete it.
-                */
-
-                audioContainer.removeChild(
-                    audio
-                );
-
-
-                /*
-                Give this message its own wrapper.
-                */
-
-                const playback =
-                    document.createElement(
-                        "div"
-                    );
-
-
-                playback.className =
-                    "espeakAudioInstance";
-
-
-                playback.appendChild(
-                    audio
-                );
-
-
-                espeakPlaybackContainer.appendChild(
-                    playback
-                );
-
-
-                /*
-                ====================================================
-                OWN MESSAGE TRACKING
-                ====================================================
-
-                Only our own previous message is stopped.
-
-                Other users' audio is NEVER touched.
-                */
-
-                if (
-                    player.id === myId
-                ) {
-
-                    if (
-                        myEspeakAudio &&
-                        myEspeakAudio !== audio
-                    ) {
-
-                        try {
-
-                            myEspeakAudio.pause();
-
-                            myEspeakAudio.currentTime =
-                                0;
-
-                        } catch (error) {
-
-                            console.log(
-                                "Could not stop previous own eSpeak audio.",
-                                error
-                            );
-                        }
-                    }
-
-
-                    myEspeakAudio =
-                        audio;
-                }
-
-
-                /*
-                ====================================================
-                CLEANUP
-                ====================================================
-                */
-
-                const cleanup =
-                    () => {
-
-                        if (
-                            bubble.parentNode
-                        ) {
-
-                            bubble.remove();
-                        }
-
-
-                        playback.remove();
-
-
-                        if (
-                            player.id === myId &&
-                            myEspeakAudio === audio
-                        ) {
-
-                            myEspeakAudio =
-                                null;
-                        }
-                    };
-
-
-                audio.addEventListener(
-                    "ended",
-                    cleanup,
-                    {
-                        once:
-                            true
-                    }
-                );
-
-
-                audio.addEventListener(
-                    "error",
-                    cleanup,
-                    {
-                        once:
-                            true
-                    }
-                );
-
-
-                /*
-                ====================================================
-                PLAY
-                ====================================================
-
-                Every audio element gets its own play() call.
-
-                There is no shared queue.
-                */
-
-                const playPromise =
-                    audio.play();
-
-
-                if (
-                    playPromise &&
-                    typeof playPromise.catch ===
-                        "function"
-                ) {
-
-                    playPromise.catch(
-                        (error) => {
-
-                            console.error(
-                                "eSpeak playback error:",
-                                error
-                            );
-
-                        }
-                    );
-                }
-
-            },
-            50
-        );
-}
-
-
-/*
-============================================================
-SEND MESSAGE
-============================================================
-*/
 
 function sendMessage() {
+    var text;
 
-    const text =
-        messageInput.value.trim();
-
+    text = messageInput.value;
 
     if (!text) {
         return;
     }
 
+    messageInput.value = "";
 
-    socket.emit(
-        "message",
-        text
+    ajax(
+        "POST",
+        "/api/send",
+        {
+            id: myId,
+            message: text
+        },
+        null
     );
-
-
-    messageInput.value =
-        "";
-
-
-    messageInput.focus();
 }
 
+function showSystemMessage(text) {
+    if (window.console) {
+        try {
+            console.log(text);
+        } catch (e) {}
+    }
+}
 
-startButton.addEventListener(
-    "click",
-    sendMessage
-);
+function initialize() {
+    loginScreen = $("loginScreen");
+    desktop = $("desktop");
 
+    nameInput = $("nameInput");
+    roomInput = $("roomInput");
+    submitButton = $("submitButton");
 
-messageInput.addEventListener(
-    "keydown",
-    (event) => {
+    world = $("world");
 
-        if (
-            event.key === "Enter"
-        ) {
+    messageInput = $("messageInput");
+    startButton = $("startButton");
 
-            event.preventDefault();
+    settingsButton = $("settingsButton");
+    settingsPanel = $("settingsPanel");
+    closeSettings = $("closeSettings");
 
+    addEvent(submitButton, "click", joinRoom);
+
+    addEvent(nameInput, "keydown", function (event) {
+        event = event || window.event;
+
+        if (event.keyCode === 13) {
+            joinRoom();
+        }
+    });
+
+    addEvent(roomInput, "keydown", function (event) {
+        event = event || window.event;
+
+        if (event.keyCode === 13) {
+            joinRoom();
+        }
+    });
+
+    addEvent(startButton, "click", sendMessage);
+
+    addEvent(messageInput, "keydown", function (event) {
+        event = event || window.event;
+
+        if (event.keyCode === 13) {
             sendMessage();
         }
+    });
+
+    addEvent(settingsButton, "click", function (event) {
+        settingsPanel.style.display = "block";
+
+        preventDefault(event);
+        stopEvent(event);
+    });
+
+    addEvent(closeSettings, "click", function () {
+        settingsPanel.style.display = "none";
+    });
+
+    /*
+     * Mouse dragging.
+     */
+
+    addEvent(document, "mousemove", dragMove);
+    addEvent(document, "mouseup", endDrag);
+
+    /*
+     * Touch dragging for Windows Phone IE.
+     */
+
+    addEvent(document, "touchmove", dragMove);
+    addEvent(document, "touchend", endDrag);
+    addEvent(document, "touchcancel", endDrag);
+
+    /*
+     * Pointer Events if available.
+     */
+
+    addEvent(document, "pointermove", dragMove);
+    addEvent(document, "pointerup", endDrag);
+    addEvent(document, "pointercancel", endDrag);
+}
+
+if (document.readyState === "complete") {
+    initialize();
+} else {
+    addEvent(window, "load", initialize);
+}
+
+addEvent(window, "beforeunload", function () {
+    if (myId) {
+        ajax(
+            "POST",
+            "/api/leave",
+            {
+                id: myId
+            },
+            null
+        );
     }
-);
-
-
-messageInput.addEventListener(
-    "focus",
-    () => {
-
-        messageInput.select();
-    }
-);
+});
