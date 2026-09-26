@@ -115,7 +115,7 @@ function validRoom(value) {
 function clamp(value, min, max) {
     value = Number(value);
 
-    if (isNaN(value)) {
+    if (!isFinite(value)) {
         value = min;
     }
 
@@ -138,21 +138,44 @@ HTTP HELPERS
 */
 
 function sendJSON(res, status, data) {
-    if (res.writableEnded || res.headersSent) {
+    if (!res) {
         return;
     }
 
-    var body = JSON.stringify(data);
+    if (res.writableEnded || res.destroyed) {
+        return;
+    }
 
-    res.writeHead(status, {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        "Pragma": "no-cache",
-        "Expires": "0",
-        "Content-Length": Buffer.byteLength(body)
-    });
+    var body;
 
-    res.end(body);
+    try {
+        body = JSON.stringify(data);
+    } catch (e) {
+        body = '{"error":"Server error"}';
+        status = 500;
+    }
+
+    if (res.writableEnded || res.destroyed) {
+        return;
+    }
+
+    try {
+        res.writeHead(status, {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Content-Length": Buffer.byteLength(body),
+            "Connection": "keep-alive"
+        });
+
+        res.end(body);
+    } catch (e) {
+        /*
+        The browser may have disconnected between the checks.
+        There is nothing else to send in that situation.
+        */
+    }
 }
 
 function parseBody(req, callback) {
@@ -169,6 +192,10 @@ function parseBody(req, callback) {
     }
 
     req.on("data", function(chunk) {
+        if (finished) {
+            return;
+        }
+
         body += chunk.toString();
 
         if (body.length > 100000) {
@@ -197,6 +224,10 @@ function parseBody(req, callback) {
     req.on("error", function() {
         done(null);
     });
+
+    req.on("aborted", function() {
+        done(null);
+    });
 }
 
 
@@ -207,12 +238,16 @@ EVENT SYSTEM
 */
 
 function addEvent(client, event) {
-    if (!client) {
+    if (!client || client.removed) {
         return;
     }
 
     client.events.push(event);
 
+    /*
+    If this client is currently waiting in /api/poll,
+    immediately complete that poll.
+    */
     if (client.pollResponse) {
         finishPoll(client);
     }
@@ -228,6 +263,10 @@ function broadcast(room, event, exceptClientId) {
 
         var client = clients[id];
 
+        if (!client || client.removed) {
+            continue;
+        }
+
         if (!client.player) {
             continue;
         }
@@ -236,7 +275,10 @@ function broadcast(room, event, exceptClientId) {
             continue;
         }
 
-        if (exceptClientId && client.id === exceptClientId) {
+        if (
+            exceptClientId &&
+            client.id === String(exceptClientId)
+        ) {
             continue;
         }
 
@@ -247,12 +289,12 @@ function broadcast(room, event, exceptClientId) {
 
 /*
 ============================================================
-LONG POLLING
+POLLING
 ============================================================
 */
 
 function finishPoll(client) {
-    if (!client) {
+    if (!client || client.removed) {
         return;
     }
 
@@ -262,6 +304,11 @@ function finishPoll(client) {
         return;
     }
 
+    /*
+    Detach the response BEFORE doing anything else.
+    This prevents an event generated during completion
+    from trying to complete the same response twice.
+    */
     client.pollResponse = null;
 
     if (client.pollTimer) {
@@ -269,7 +316,10 @@ function finishPoll(client) {
         client.pollTimer = null;
     }
 
-    if (res.writableEnded || res.destroyed) {
+    if (
+        res.writableEnded ||
+        res.destroyed
+    ) {
         return;
     }
 
@@ -281,6 +331,77 @@ function finishPoll(client) {
     });
 }
 
+function startPoll(client, req, res) {
+    if (!client || client.removed) {
+        return;
+    }
+
+    /*
+    Never allow two active polls for one client.
+    */
+    if (client.pollResponse) {
+        /*
+        This should normally never happen because the client
+        waits for the previous poll to finish.
+
+        If it does happen, reject the new request instead of
+        destroying the existing poll.
+        */
+        sendJSON(res, 409, {
+            error: "Poll already active"
+        });
+
+        return;
+    }
+
+    client.lastActivity = Date.now();
+    client.pollResponse = res;
+
+    /*
+    If an event arrived between the initial check and here,
+    send it immediately.
+    */
+    if (client.events.length > 0) {
+        finishPoll(client);
+        return;
+    }
+
+    /*
+    20 second long poll.
+
+    The client immediately starts another poll when this
+    one finishes, so messages remain responsive while avoiding
+    excessive requests.
+    */
+    client.pollTimer = setTimeout(function() {
+        if (!client || client.removed) {
+            return;
+        }
+
+        finishPoll(client);
+    }, 20000);
+
+    /*
+    Detect broken browser connections.
+
+    Do NOT blindly remove the player on every request close.
+    Only remove it if this exact response is still active.
+    */
+    function connectionEnded() {
+        if (
+            client &&
+            !client.removed &&
+            client.pollResponse === res
+        ) {
+            removeClient(client.id);
+        }
+    }
+
+    req.on("aborted", connectionEnded);
+    req.on("error", connectionEnded);
+    res.on("error", connectionEnded);
+}
+
 
 /*
 ============================================================
@@ -289,15 +410,14 @@ DISCONNECT / REMOVE CLIENT
 */
 
 function removeClient(clientId) {
+    clientId = String(clientId);
+
     var client = clients[clientId];
 
     if (!client) {
         return;
     }
 
-    /*
-    Prevent this from running twice.
-    */
     if (client.removed) {
         return;
     }
@@ -310,33 +430,30 @@ function removeClient(clientId) {
     }
 
     /*
-    Close any pending long-poll request.
+    Detach pending poll before closing it.
     */
-    if (client.pollResponse) {
-        var oldResponse = client.pollResponse;
-        client.pollResponse = null;
+    var pendingResponse = client.pollResponse;
+    client.pollResponse = null;
 
-        if (!oldResponse.writableEnded) {
+    if (pendingResponse) {
+        if (
+            !pendingResponse.writableEnded &&
+            !pendingResponse.destroyed
+        ) {
             try {
-                oldResponse.end();
+                pendingResponse.end();
             } catch (e) {}
         }
     }
 
     var player = client.player;
 
-    /*
-    IMPORTANT:
-    Delete the player BEFORE broadcasting so it can no longer
-    be considered an active player.
-    */
-    if (player && players[player.id]) {
+    if (
+        player &&
+        players[player.id]
+    ) {
         delete players[player.id];
 
-        /*
-        Tell every remaining player in the room that this
-        character has disappeared.
-        */
         broadcast(
             player.room,
             {
@@ -365,7 +482,7 @@ function joinClient(name, room) {
         name: validName(name),
         room: validRoom(room),
         x: Math.random() * 90 + 5,
-        y: Math.random() * 80 + 10,
+        y: Math.random() * 75 + 12,
         color: randomColor(),
         character: "bonzi"
     };
@@ -373,10 +490,14 @@ function joinClient(name, room) {
     var client = {
         id: clientId,
         player: player,
+
         events: [],
+
         pollResponse: null,
         pollTimer: null,
+
         removed: false,
+
         lastActivity: Date.now()
     };
 
@@ -384,7 +505,7 @@ function joinClient(name, room) {
     clients[client.id] = client;
 
     /*
-    Send all existing players in this room to the new client.
+    Give the new client all existing players.
     */
     var id;
 
@@ -397,18 +518,29 @@ function joinClient(name, room) {
             continue;
         }
 
-        if (players[id].room !== player.room) {
+        if (
+            players[id].room !==
+            player.room
+        ) {
             continue;
         }
 
         client.events.push({
             type: "playerJoined",
-            player: players[id]
+            player: {
+                id: players[id].id,
+                name: players[id].name,
+                room: players[id].room,
+                x: players[id].x,
+                y: players[id].y,
+                color: players[id].color,
+                character: players[id].character
+            }
         });
     }
 
     /*
-    Tell everyone else about the new player.
+    Tell everybody else.
     */
     broadcast(
         player.room,
@@ -446,27 +578,44 @@ function getContentType(filePath) {
         ".mp3": "audio/mpeg"
     };
 
-    return types[ext] || "application/octet-stream";
+    return (
+        types[ext] ||
+        "application/octet-stream"
+    );
 }
 
 function serveStatic(req, res) {
-    var requestPath = req.url.split("?")[0];
+    var requestPath =
+        req.url.split("?")[0];
 
     if (requestPath === "/") {
         requestPath = "/index.html";
     }
 
     try {
-        requestPath = decodeURIComponent(requestPath);
+        requestPath =
+            decodeURIComponent(
+                requestPath
+            );
     } catch (e) {
         sendJSON(res, 400, {
             error: "Bad URL"
         });
+
         return;
     }
 
     /*
-    Security: never allow paths outside public/.
+    Normalize the path.
+    */
+    requestPath =
+        requestPath.replace(
+            /\/+/g,
+            "/"
+        );
+
+    /*
+    Security.
     */
     if (
         requestPath.indexOf("..") !== -1 ||
@@ -475,52 +624,89 @@ function serveStatic(req, res) {
         sendJSON(res, 403, {
             error: "Forbidden"
         });
+
         return;
     }
 
-    var filePath = path.join(
-        PUBLIC_DIR,
-        requestPath
-    );
+    var relativePath =
+        requestPath.replace(
+            /^\/+/,
+            ""
+        );
+
+    var filePath =
+        path.join(
+            PUBLIC_DIR,
+            relativePath
+        );
 
     if (
         filePath !== PUBLIC_DIR &&
-        filePath.indexOf(PUBLIC_DIR + path.sep) !== 0
+        filePath.indexOf(
+            PUBLIC_DIR + path.sep
+        ) !== 0
     ) {
         sendJSON(res, 403, {
             error: "Forbidden"
         });
+
         return;
     }
 
-    fs.stat(filePath, function(err, stat) {
-        if (err || !stat.isFile()) {
-            sendJSON(res, 404, {
-                error: "Not found"
-            });
-            return;
-        }
-
-        fs.readFile(filePath, function(readErr, data) {
-            if (readErr) {
-                sendJSON(res, 500, {
-                    error: "Could not read file"
+    fs.stat(
+        filePath,
+        function(err, stat) {
+            if (
+                err ||
+                !stat ||
+                !stat.isFile()
+            ) {
+                sendJSON(res, 404, {
+                    error: "Not found"
                 });
+
                 return;
             }
 
-            if (res.writableEnded || res.headersSent) {
-                return;
-            }
+            fs.readFile(
+                filePath,
+                function(readErr, data) {
+                    if (readErr) {
+                        sendJSON(res, 500, {
+                            error: "Could not read file"
+                        });
 
-            res.writeHead(200, {
-                "Content-Type": getContentType(filePath),
-                "Cache-Control": "no-cache"
-            });
+                        return;
+                    }
 
-            res.end(data);
-        });
-    });
+                    if (
+                        res.writableEnded ||
+                        res.destroyed
+                    ) {
+                        return;
+                    }
+
+                    try {
+                        res.writeHead(200, {
+                            "Content-Type":
+                                getContentType(filePath),
+
+                            "Cache-Control":
+                                "no-cache, no-store, must-revalidate",
+
+                            "Pragma": "no-cache",
+                            "Expires": "0",
+
+                            "Content-Length":
+                                data.length
+                        });
+
+                        res.end(data);
+                    } catch (e) {}
+                }
+            );
+        }
+    );
 }
 
 
@@ -530,455 +716,609 @@ SERVER
 ============================================================
 */
 
-var server = http.createServer(function(req, res) {
-    var parsed;
+var server = http.createServer(
+    function(req, res) {
 
-    try {
-        parsed = new URL(
-            req.url,
-            "http://" + (req.headers.host || "localhost")
-        );
-    } catch (e) {
-        sendJSON(res, 400, {
-            error: "Bad request"
-        });
-        return;
-    }
+        var parsed;
 
-    /*
-    --------------------------------------------------------
-    JOIN
-    --------------------------------------------------------
-    */
+        try {
+            parsed = new URL(
+                req.url,
+                "http://" +
+                (
+                    req.headers.host ||
+                    "localhost"
+                )
+            );
+        } catch (e) {
+            sendJSON(res, 400, {
+                error: "Bad request"
+            });
 
-    if (
-        req.method === "POST" &&
-        parsed.pathname === "/api/join"
-    ) {
-        parseBody(req, function(body) {
-            if (!body) {
-                sendJSON(res, 400, {
-                    error: "Invalid request"
-                });
-                return;
-            }
+            return;
+        }
 
-            var client = joinClient(
-                body.name,
-                body.room
+
+        /*
+        --------------------------------------------------------
+        JOIN
+        --------------------------------------------------------
+        */
+
+        if (
+            req.method === "POST" &&
+            parsed.pathname === "/api/join"
+        ) {
+            parseBody(
+                req,
+                function(body) {
+
+                    if (!body) {
+                        sendJSON(res, 400, {
+                            error: "Invalid request"
+                        });
+
+                        return;
+                    }
+
+                    var client =
+                        joinClient(
+                            body.name,
+                            body.room
+                        );
+
+                    sendJSON(res, 200, {
+                        id: client.id,
+                        player: client.player,
+                        events: client.events
+                    });
+
+                    /*
+                    Important: clear the initial events only
+                    after they have been included in the response.
+                    */
+                    client.events = [];
+                }
             );
 
-            client.lastActivity = Date.now();
-
-            sendJSON(res, 200, {
-                id: client.id,
-                player: client.player,
-                events: client.events
-            });
-
-            client.events = [];
-        });
-
-        return;
-    }
-
-
-    /*
-    --------------------------------------------------------
-    POLL
-    --------------------------------------------------------
-    */
-
-    if (
-        req.method === "GET" &&
-        parsed.pathname === "/api/poll"
-    ) {
-        var pollId = parsed.searchParams.get("id");
-        var pollClient = clients[pollId];
-
-        if (!pollClient || pollClient.removed) {
-            sendJSON(res, 404, {
-                error: "Client not found"
-            });
             return;
         }
 
-        pollClient.lastActivity = Date.now();
 
         /*
-        If events are already waiting, send immediately.
+        --------------------------------------------------------
+        POLL
+        --------------------------------------------------------
         */
-        if (pollClient.events.length > 0) {
-            finishPoll(pollClient);
-            return;
-        }
 
-        /*
-        If the client somehow has an old poll still open,
-        close it first.
-        */
-        if (pollClient.pollResponse) {
-            try {
-                pollClient.pollResponse.end();
-            } catch (e) {}
+        if (
+            req.method === "GET" &&
+            parsed.pathname === "/api/poll"
+        ) {
+            var pollId =
+                String(
+                    parsed.searchParams.get("id") ||
+                    ""
+                );
 
-            pollClient.pollResponse = null;
-        }
+            var pollClient =
+                clients[pollId];
 
-        pollClient.pollResponse = res;
-
-        /*
-        Long poll timeout.
-        */
-        pollClient.pollTimer = setTimeout(function() {
-            if (!pollClient || pollClient.removed) {
-                return;
-            }
-
-            finishPoll(pollClient);
-        }, 25000);
-
-        /*
-        VERY IMPORTANT:
-        If the browser closes its tab, the HTTP request
-        eventually emits "close". Remove the player
-        immediately instead of waiting for the 120-second
-        cleanup timer.
-        */
-        req.on("close", function() {
-            /*
-            Only remove the client if this request is still
-            the client's active poll request.
-
-            This prevents an old poll request from removing
-            a client after it has already started another one.
-            */
             if (
-                pollClient &&
-                pollClient.pollResponse === res
+                !pollClient ||
+                pollClient.removed
             ) {
-                removeClient(pollClient.id);
-            }
-        });
-
-        return;
-    }
-
-
-    /*
-    --------------------------------------------------------
-    SEND MESSAGE / COMMAND
-    --------------------------------------------------------
-    */
-
-    if (
-        req.method === "POST" &&
-        parsed.pathname === "/api/send"
-    ) {
-        parseBody(req, function(body) {
-            if (!body) {
-                sendJSON(res, 400, {
-                    error: "Invalid request"
-                });
-                return;
-            }
-
-            var client = clients[String(body.id)];
-
-            if (!client || client.removed || !client.player) {
                 sendJSON(res, 404, {
                     error: "Client not found"
                 });
+
                 return;
             }
 
-            client.lastActivity = Date.now();
+            startPoll(
+                pollClient,
+                req,
+                res
+            );
 
-            var text = cleanText(body.text);
+            return;
+        }
 
-            if (!text) {
-                sendJSON(res, 200, {
-                    ok: true
+
+        /*
+        --------------------------------------------------------
+        HEARTBEAT
+        --------------------------------------------------------
+        */
+
+        if (
+            req.method === "GET" &&
+            parsed.pathname === "/api/heartbeat"
+        ) {
+            var heartbeatId =
+                String(
+                    parsed.searchParams.get("id") ||
+                    ""
+                );
+
+            var heartbeatClient =
+                clients[heartbeatId];
+
+            if (
+                !heartbeatClient ||
+                heartbeatClient.removed
+            ) {
+                sendJSON(res, 404, {
+                    error: "Client not found"
                 });
+
                 return;
             }
 
-            /*
-            /color
-            */
-            if (text === "/color") {
-                var newRandomColor = randomColor();
+            heartbeatClient.lastActivity =
+                Date.now();
 
-                client.player.color = newRandomColor;
+            sendJSON(res, 200, {
+                ok: true
+            });
 
-                broadcast(
-                    client.player.room,
-                    {
-                        type: "playerColorChanged",
-                        playerId: client.player.id,
-                        color: newRandomColor
+            return;
+        }
+
+
+        /*
+        --------------------------------------------------------
+        SEND MESSAGE / COMMAND
+        --------------------------------------------------------
+        */
+
+        if (
+            req.method === "POST" &&
+            parsed.pathname === "/api/send"
+        ) {
+            parseBody(
+                req,
+                function(body) {
+
+                    if (!body) {
+                        sendJSON(res, 400, {
+                            error: "Invalid request"
+                        });
+
+                        return;
                     }
-                );
 
-                sendJSON(res, 200, {
-                    ok: true
-                });
+                    var client =
+                        clients[
+                            String(body.id)
+                        ];
 
-                return;
-            }
+                    if (
+                        !client ||
+                        client.removed ||
+                        !client.player
+                    ) {
+                        sendJSON(res, 404, {
+                            error: "Client not found"
+                        });
 
-            /*
-            /color red
-            /color #ff0000
-            */
-            if (text.indexOf("/color ") === 0) {
-                var colorValue = cleanText(
-                    text.substring(7)
-                );
+                        return;
+                    }
 
-                var newColor = getColor(colorValue);
+                    client.lastActivity =
+                        Date.now();
 
-                if (!newColor) {
-                    addEvent(client, {
-                        type: "systemMessage",
-                        text: "Invalid color."
-                    });
+                    var text =
+                        cleanText(
+                            body.text
+                        );
+
+                    if (!text) {
+                        sendJSON(res, 200, {
+                            ok: true
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                    /color
+                    */
+
+                    if (text === "/color") {
+
+                        var newRandomColor =
+                            randomColor();
+
+                        client.player.color =
+                            newRandomColor;
+
+                        broadcast(
+                            client.player.room,
+                            {
+                                type:
+                                    "playerColorChanged",
+
+                                playerId:
+                                    client.player.id,
+
+                                color:
+                                    newRandomColor
+                            }
+                        );
+
+                        sendJSON(res, 200, {
+                            ok: true
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                    /color VALUE
+                    */
+
+                    if (
+                        text.indexOf(
+                            "/color "
+                        ) === 0
+                    ) {
+                        var colorValue =
+                            cleanText(
+                                text.substring(7)
+                            );
+
+                        var newColor =
+                            getColor(
+                                colorValue
+                            );
+
+                        if (!newColor) {
+                            addEvent(
+                                client,
+                                {
+                                    type:
+                                        "systemMessage",
+
+                                    text:
+                                        "Invalid color."
+                                }
+                            );
+
+                            sendJSON(res, 200, {
+                                ok: true
+                            });
+
+                            return;
+                        }
+
+                        client.player.color =
+                            newColor;
+
+                        broadcast(
+                            client.player.room,
+                            {
+                                type:
+                                    "playerColorChanged",
+
+                                playerId:
+                                    client.player.id,
+
+                                color:
+                                    newColor
+                            }
+                        );
+
+                        sendJSON(res, 200, {
+                            ok: true
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                    /char
+                    */
+
+                    if (text === "/char") {
+
+                        var newCharacter =
+                            client.player.character ===
+                            "bonzi"
+                                ? "square"
+                                : "bonzi";
+
+                        client.player.character =
+                            newCharacter;
+
+                        broadcast(
+                            client.player.room,
+                            {
+                                type:
+                                    "playerCharacterChanged",
+
+                                playerId:
+                                    client.player.id,
+
+                                character:
+                                    newCharacter
+                            }
+                        );
+
+                        sendJSON(res, 200, {
+                            ok: true
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                    /char bonzi
+                    */
+
+                    if (
+                        text ===
+                        "/char bonzi"
+                    ) {
+                        client.player.character =
+                            "bonzi";
+
+                        broadcast(
+                            client.player.room,
+                            {
+                                type:
+                                    "playerCharacterChanged",
+
+                                playerId:
+                                    client.player.id,
+
+                                character:
+                                    "bonzi"
+                            }
+                        );
+
+                        sendJSON(res, 200, {
+                            ok: true
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                    /char square
+                    */
+
+                    if (
+                        text ===
+                        "/char square"
+                    ) {
+                        client.player.character =
+                            "square";
+
+                        broadcast(
+                            client.player.room,
+                            {
+                                type:
+                                    "playerCharacterChanged",
+
+                                playerId:
+                                    client.player.id,
+
+                                character:
+                                    "square"
+                            }
+                        );
+
+                        sendJSON(res, 200, {
+                            ok: true
+                        });
+
+                        return;
+                    }
+
+
+                    /*
+                    NORMAL MESSAGE
+                    */
+
+                    broadcast(
+                        client.player.room,
+                        {
+                            type: "message",
+
+                            playerId:
+                                client.player.id,
+
+                            name:
+                                client.player.name,
+
+                            text: text
+                        }
+                    );
 
                     sendJSON(res, 200, {
                         ok: true
                     });
-
-                    return;
-                }
-
-                client.player.color = newColor;
-
-                broadcast(
-                    client.player.room,
-                    {
-                        type: "playerColorChanged",
-                        playerId: client.player.id,
-                        color: newColor
-                    }
-                );
-
-                sendJSON(res, 200, {
-                    ok: true
-                });
-
-                return;
-            }
-
-            /*
-            /char
-            */
-            if (text === "/char") {
-                var newCharacter =
-                    client.player.character === "bonzi"
-                        ? "square"
-                        : "bonzi";
-
-                client.player.character = newCharacter;
-
-                broadcast(
-                    client.player.room,
-                    {
-                        type: "playerCharacterChanged",
-                        playerId: client.player.id,
-                        character: newCharacter
-                    }
-                );
-
-                sendJSON(res, 200, {
-                    ok: true
-                });
-
-                return;
-            }
-
-            /*
-            /char bonzi
-            */
-            if (text === "/char bonzi") {
-                client.player.character = "bonzi";
-
-                broadcast(
-                    client.player.room,
-                    {
-                        type: "playerCharacterChanged",
-                        playerId: client.player.id,
-                        character: "bonzi"
-                    }
-                );
-
-                sendJSON(res, 200, {
-                    ok: true
-                });
-
-                return;
-            }
-
-            /*
-            /char square
-            */
-            if (text === "/char square") {
-                client.player.character = "square";
-
-                broadcast(
-                    client.player.room,
-                    {
-                        type: "playerCharacterChanged",
-                        playerId: client.player.id,
-                        character: "square"
-                    }
-                );
-
-                sendJSON(res, 200, {
-                    ok: true
-                });
-
-                return;
-            }
-
-            /*
-            Normal chat message.
-            */
-            broadcast(
-                client.player.room,
-                {
-                    type: "message",
-                    playerId: client.player.id,
-                    name: client.player.name,
-                    text: text
                 }
             );
 
-            sendJSON(res, 200, {
-                ok: true
-            });
-
-        });
-
-        return;
-    }
+            return;
+        }
 
 
-    /*
-    --------------------------------------------------------
-    MOVE
-    --------------------------------------------------------
-    */
+        /*
+        --------------------------------------------------------
+        MOVE
+        --------------------------------------------------------
+        */
 
-    if (
-        req.method === "POST" &&
-        parsed.pathname === "/api/move"
-    ) {
-        parseBody(req, function(body) {
-            if (!body) {
-                sendJSON(res, 400, {
-                    error: "Invalid request"
-                });
-                return;
-            }
+        if (
+            req.method === "POST" &&
+            parsed.pathname === "/api/move"
+        ) {
+            parseBody(
+                req,
+                function(body) {
 
-            var sender = clients[String(body.senderId)];
+                    if (!body) {
+                        sendJSON(res, 400, {
+                            error: "Invalid request"
+                        });
 
-            if (
-                !sender ||
-                sender.removed ||
-                !sender.player
-            ) {
-                sendJSON(res, 404, {
-                    error: "Client not found"
-                });
-                return;
-            }
+                        return;
+                    }
 
-            sender.lastActivity = Date.now();
+                    var sender =
+                        clients[
+                            String(body.senderId)
+                        ];
 
-            var target = players[String(body.playerId)];
+                    if (
+                        !sender ||
+                        sender.removed ||
+                        !sender.player
+                    ) {
+                        sendJSON(res, 404, {
+                            error:
+                                "Client not found"
+                        });
 
-            if (!target) {
-                sendJSON(res, 404, {
-                    error: "Player not found"
-                });
-                return;
-            }
+                        return;
+                    }
 
-            /*
-            Only allow dragging someone in the same room.
-            */
-            if (target.room !== sender.player.room) {
-                sendJSON(res, 403, {
-                    error: "Wrong room"
-                });
-                return;
-            }
+                    sender.lastActivity =
+                        Date.now();
 
-            target.x = clamp(body.x, 2, 98);
-            target.y = clamp(body.y, 2, 98);
+                    var target =
+                        players[
+                            String(body.playerId)
+                        ];
 
-            broadcast(
-                target.room,
-                {
-                    type: "playerMoved",
-                    playerId: target.id,
-                    x: target.x,
-                    y: target.y
+                    if (!target) {
+                        sendJSON(res, 404, {
+                            error:
+                                "Player not found"
+                        });
+
+                        return;
+                    }
+
+                    if (
+                        target.room !==
+                        sender.player.room
+                    ) {
+                        sendJSON(res, 403, {
+                            error:
+                                "Wrong room"
+                        });
+
+                        return;
+                    }
+
+                    target.x =
+                        clamp(
+                            body.x,
+                            2,
+                            98
+                        );
+
+                    target.y =
+                        clamp(
+                            body.y,
+                            2,
+                            98
+                        );
+
+                    broadcast(
+                        target.room,
+                        {
+                            type:
+                                "playerMoved",
+
+                            playerId:
+                                target.id,
+
+                            x:
+                                target.x,
+
+                            y:
+                                target.y
+                        }
+                    );
+
+                    sendJSON(res, 200, {
+                        ok: true
+                    });
                 }
             );
 
-            sendJSON(res, 200, {
-                ok: true
-            });
+            return;
+        }
 
-        });
 
-        return;
+        /*
+        --------------------------------------------------------
+        LEAVE
+        --------------------------------------------------------
+        */
+
+        if (
+            req.method === "POST" &&
+            parsed.pathname === "/api/leave"
+        ) {
+            parseBody(
+                req,
+                function(body) {
+
+                    if (!body) {
+                        sendJSON(res, 400, {
+                            error:
+                                "Invalid request"
+                        });
+
+                        return;
+                    }
+
+                    var clientId =
+                        String(
+                            body.id || ""
+                        );
+
+                    if (
+                        clients[clientId]
+                    ) {
+                        removeClient(
+                            clientId
+                        );
+                    }
+
+                    sendJSON(res, 200, {
+                        ok: true
+                    });
+                }
+            );
+
+            return;
+        }
+
+
+        /*
+        --------------------------------------------------------
+        STATIC
+        --------------------------------------------------------
+        */
+
+        serveStatic(
+            req,
+            res
+        );
     }
-
-
-    /*
-    --------------------------------------------------------
-    LEAVE
-    --------------------------------------------------------
-    */
-
-    if (
-        req.method === "POST" &&
-        parsed.pathname === "/api/leave"
-    ) {
-        parseBody(req, function(body) {
-            if (!body) {
-                sendJSON(res, 400, {
-                    error: "Invalid request"
-                });
-                return;
-            }
-
-            var clientId = String(body.id);
-
-            if (clients[clientId]) {
-                removeClient(clientId);
-            }
-
-            sendJSON(res, 200, {
-                ok: true
-            });
-        });
-
-        return;
-    }
-
-
-    /*
-    --------------------------------------------------------
-    STATIC FILES
-    --------------------------------------------------------
-    */
-
-    serveStatic(req, res);
-});
+);
 
 
 /*
@@ -986,31 +1326,54 @@ var server = http.createServer(function(req, res) {
 BACKUP CLEANUP
 ============================================================
 
-The close event handles normal tab/browser disconnections.
+Normal polling disconnects are detected quickly.
 
-This cleanup is only a backup for cases where a connection
-dies without producing the expected close event.
+This timer catches cases where the browser/network dies
+without giving Node a useful disconnect event.
+============================================================
 */
 
-setInterval(function() {
-    var now = Date.now();
-    var id;
+setInterval(
+    function() {
 
-    for (id in clients) {
-        if (!clients.hasOwnProperty(id)) {
-            continue;
+        var now =
+            Date.now();
+
+        var id;
+
+        for (id in clients) {
+
+            if (!clients.hasOwnProperty(id)) {
+                continue;
+            }
+
+            var client =
+                clients[id];
+
+            if (
+                !client ||
+                client.removed
+            ) {
+                continue;
+            }
+
+            /*
+            60 seconds without ANY activity means the
+            client is probably gone.
+
+            The client sends heartbeat requests while active.
+            */
+            if (
+                now -
+                client.lastActivity >
+                60000
+            ) {
+                removeClient(id);
+            }
         }
-
-        var client = clients[id];
-
-        if (
-            !client.removed &&
-            now - client.lastActivity > 120000
-        ) {
-            removeClient(id);
-        }
-    }
-}, 30000);
+    },
+    15000
+);
 
 
 /*
@@ -1019,8 +1382,13 @@ START
 ============================================================
 */
 
-server.listen(PORT, "0.0.0.0", function() {
-    console.log(
-        "Chat server running on port " + PORT
-    );
-});
+server.listen(
+    PORT,
+    "0.0.0.0",
+    function() {
+        console.log(
+            "Chat server running on port " +
+            PORT
+        );
+    }
+);
